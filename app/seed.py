@@ -804,6 +804,30 @@ def executar() -> None:
     print("As senhas estao no seu arquivo .env.\n")
 
 
+def preparar_sistema_vazio() -> None:
+    """
+    Prepara o MINIMO para o sistema funcionar, sem dado nenhum inventado.
+
+    Cria apenas:
+      - as 3 categorias de acesso (com as senhas do .env)
+      - o controle de acesso
+
+    A carteira fica vazia, esperando a primeira planilha ou os dados que
+    chegarem pela API. E assim que voce sobe o sistema para uso real.
+    """
+    print("\n=== PREPARANDO SISTEMA (sem dados de demonstracao) ===\n")
+    criar_tabelas()
+
+    db = SessionLocal()
+    try:
+        criar_usuarios(db)
+        criar_controle_de_acesso(db)
+    finally:
+        db.close()
+
+    print("\nSistema pronto e vazio. A carteira entra pela planilha ou pela API.\n")
+
+
 def garantir_banco() -> bool:
     """
     Prepara o banco AUTOMATICAMENTE quando o sistema liga.
@@ -816,11 +840,15 @@ def garantir_banco() -> bool:
       - as tabelas que faltarem sao criadas
       - os dados iniciais SO entram se o banco estiver vazio
 
-    Assim, se ja houver dados (por exemplo, uma planilha que voces
-    enviaram), nada e apagado. Para reiniciar do zero de proposito,
-    rode "python -m app.seed", que limpa e recarrega.
+    Assim, se ja houver dados (uma planilha que voces enviaram, e-mails
+    autorizados, boletos emitidos), NADA e apagado. Para reiniciar do
+    zero de proposito, rode "python -m app.seed".
 
-    Devolve True se carregou os dados iniciais, False se ja havia dados.
+    O que entra depende da configuracao CARREGAR_DADOS_DEMO:
+      sim -> tudo (50 apolices, sinistros, comissoes...)
+      nao -> so as categorias de acesso, com a carteira vazia
+
+    Devolve True se carregou alguma coisa, False se ja havia dados.
     """
     criar_tabelas()
 
@@ -831,7 +859,11 @@ def garantir_banco() -> bool:
     finally:
         db.close()
 
-    executar()
+    if config.CARREGAR_DADOS_DEMO:
+        executar()
+    else:
+        preparar_sistema_vazio()
+
     return True
 
 

@@ -34,7 +34,7 @@ CREATE TABLE authorized_emails (
 	criado_em DATETIME NOT NULL, 
 	PRIMARY KEY (id)
 );
-INSERT INTO "authorized_emails" VALUES(1,'@sebraeprev.com.br','TODAS','Domínio do Sebrae Previdência',1,'instalação do sistema','2026-08-18 17:37:03.810557');
+INSERT INTO "authorized_emails" VALUES(1,'@sebraeprev.com.br','TODAS','Domínio do Sebrae Previdência',1,'instalação do sistema','2026-08-18 17:52:28.734926');
 CREATE TABLE claims (
 	id INTEGER NOT NULL, 
 	protocolo VARCHAR(20) NOT NULL, 
@@ -140,16 +140,16 @@ CREATE TABLE payments (
 	criado_em DATETIME NOT NULL, 
 	PRIMARY KEY (id)
 );
-INSERT INTO "payments" VALUES(1,'07/2026','100001','Ana Beatriz Souza','384.517.920-41',150000.0,150000.0,60.7,'101','01','Pago','2026-08-18 17:37:03.847649');
-INSERT INTO "payments" VALUES(2,'07/2026','100002','Carlos Henrique Lima','617.283.945-08',200000.0,200000.0,81.1,'101','01','Pago','2026-08-18 17:37:03.847653');
-INSERT INTO "payments" VALUES(3,'07/2026','100003','Fernanda Alves Rocha','275.619.438-70',120000.0,120000.0,50.1,'101','02','Pago','2026-08-18 17:37:03.847666');
-INSERT INTO "payments" VALUES(4,'07/2026','100004','Gustavo Pereira Martins','948.160.372-59',250000.0,250000.0,102.0,'101','02','A pagar','2026-08-18 17:37:03.847666');
-INSERT INTO "payments" VALUES(5,'07/2026','100005','Juliana Cristina Moraes','503.847.126-91',180000.0,180000.0,69.6,'101','01','Pago','2026-08-18 17:37:03.847667');
-INSERT INTO "payments" VALUES(6,'07/2026','100006','Marcelo Augusto Nunes','861.395.704-22',100000.0,100000.0,42.3,'101','03','Pago','2026-08-18 17:37:03.847667');
-INSERT INTO "payments" VALUES(7,'07/2026','100007','Patricia Oliveira Costa','429.851.630-17',220000.0,220000.0,88.7,'101','01','Em atraso','2026-08-18 17:37:03.847668');
-INSERT INTO "payments" VALUES(8,'07/2026','100008','Ricardo Mendes Ferreira','796.214.853-64',300000.0,300000.0,122.0,'101','02','Pago','2026-08-18 17:37:03.847668');
-INSERT INTO "payments" VALUES(9,'07/2026','100009','Simone Aparecida Lopes','154.762.398-53',160000.0,160000.0,64.7,'101','03','A pagar','2026-08-18 17:37:03.847669');
-INSERT INTO "payments" VALUES(10,'07/2026','100010','Thiago Rodrigues Barros','682.940.517-85',140000.0,140000.0,56.9,'101','01','Pago','2026-08-18 17:37:03.847669');
+INSERT INTO "payments" VALUES(1,'07/2026','100001','Ana Beatriz Souza','384.517.920-41',150000.0,150000.0,60.7,'101','01','Pago','2026-08-18 17:52:28.777122');
+INSERT INTO "payments" VALUES(2,'07/2026','100002','Carlos Henrique Lima','617.283.945-08',200000.0,200000.0,81.1,'101','01','Pago','2026-08-18 17:52:28.777125');
+INSERT INTO "payments" VALUES(3,'07/2026','100003','Fernanda Alves Rocha','275.619.438-70',120000.0,120000.0,50.1,'101','02','Pago','2026-08-18 17:52:28.777125');
+INSERT INTO "payments" VALUES(4,'07/2026','100004','Gustavo Pereira Martins','948.160.372-59',250000.0,250000.0,102.0,'101','02','A pagar','2026-08-18 17:52:28.777125');
+INSERT INTO "payments" VALUES(5,'07/2026','100005','Juliana Cristina Moraes','503.847.126-91',180000.0,180000.0,69.6,'101','01','Pago','2026-08-18 17:52:28.777126');
+INSERT INTO "payments" VALUES(6,'07/2026','100006','Marcelo Augusto Nunes','861.395.704-22',100000.0,100000.0,42.3,'101','03','Pago','2026-08-18 17:52:28.777126');
+INSERT INTO "payments" VALUES(7,'07/2026','100007','Patricia Oliveira Costa','429.851.630-17',220000.0,220000.0,88.7,'101','01','Em atraso','2026-08-18 17:52:28.777126');
+INSERT INTO "payments" VALUES(8,'07/2026','100008','Ricardo Mendes Ferreira','796.214.853-64',300000.0,300000.0,122.0,'101','02','Pago','2026-08-18 17:52:28.777127');
+INSERT INTO "payments" VALUES(9,'07/2026','100009','Simone Aparecida Lopes','154.762.398-53',160000.0,160000.0,64.7,'101','03','A pagar','2026-08-18 17:52:28.777127');
+INSERT INTO "payments" VALUES(10,'07/2026','100010','Thiago Rodrigues Barros','682.940.517-85',140000.0,140000.0,56.9,'101','01','Pago','2026-08-18 17:52:28.777127');
 CREATE TABLE pendencies (
 	id INTEGER NOT NULL, 
 	prioridade VARCHAR(10) NOT NULL, 
@@ -189,56 +189,56 @@ CREATE TABLE policies (
 	criado_em DATETIME NOT NULL, 
 	PRIMARY KEY (id)
 );
-INSERT INTO "policies" VALUES(1,'AP-2041','Marcos A. Ribeiro','158.813.998-69','200001',NULL,'Morte + Invalidez',250000.0,250000.0,250000.0,101.25,'2025-08-29','2026-08-29','A renovar','101','01','07/2026','prototipo','2026-08-18 17:37:03.824944');
-INSERT INTO "policies" VALUES(2,'AP-1899','Sonia R. Batista','879.730.911-41','200002',NULL,'Invalidez',0.0,100000.0,100000.0,40.5,'2025-08-31','2026-08-31','A renovar','101','01','07/2026','prototipo','2026-08-18 17:37:03.824946');
-INSERT INTO "policies" VALUES(3,'AP-1987','Fernanda C. Lima','707.536.455-68','200003',NULL,'Morte',180000.0,0.0,180000.0,72.9,'2025-09-04','2026-09-04','A renovar','101','01','07/2026','prototipo','2026-08-18 17:37:03.824947');
-INSERT INTO "policies" VALUES(4,'AP-2115','Joao P. Andrade','151.884.472-94','200004',NULL,'Invalidez',0.0,120000.0,120000.0,48.6,'2024-09-12','2026-09-12','A renovar','101','01','07/2026','prototipo','2026-08-18 17:37:03.824947');
-INSERT INTO "policies" VALUES(5,'AP-2033','Claudia M. Souza','055.761.698-71','200005',NULL,'Morte + Invalidez',300000.0,300000.0,300000.0,121.5,'2025-09-20','2026-09-20','Ativa','101','01','07/2026','prototipo','2026-08-18 17:37:03.824947');
-INSERT INTO "policies" VALUES(6,'AP-1954','Roberto Nunes','689.768.469-78','200006',NULL,'Morte',200000.0,0.0,200000.0,81.0,'2026-03-09','2027-03-09','Ativa','101','01','07/2026','prototipo','2026-08-18 17:37:03.824948');
-INSERT INTO "policies" VALUES(7,'AP-2087','Patricia Gomes','809.320.819-67','200007',NULL,'Morte + Invalidez',350000.0,350000.0,350000.0,141.75,'2026-04-23','2027-04-23','Ativa','101','01','07/2026','prototipo','2026-08-18 17:37:03.824948');
-INSERT INTO "policies" VALUES(8,'AP-2160','Eduardo Tavares','273.177.848-64','200008',NULL,'Morte',150000.0,0.0,150000.0,60.75,'2026-07-16','2027-07-16','Ativa','101','01','07/2026','prototipo','2026-08-18 17:37:03.824949');
-INSERT INTO "policies" VALUES(9,'AP-3001','Ana Beatriz Souza','384.517.920-41','100001','1986-03-15','Morte + Invalidez',150000.0,150000.0,150000.0,60.7,'2025-09-22','2026-09-22','Ativa','101','01','07/2026','planilha','2026-08-18 17:37:03.824949');
-INSERT INTO "policies" VALUES(10,'AP-3002','Carlos Henrique Lima','617.283.945-08','100002','1981-11-22','Morte + Invalidez',200000.0,200000.0,200000.0,81.1,'2025-10-22','2026-10-22','Ativa','101','01','07/2026','planilha','2026-08-18 17:37:03.824949');
-INSERT INTO "policies" VALUES(11,'AP-3003','Fernanda Alves Rocha','275.619.438-70','100003','1990-07-08','Morte + Invalidez',120000.0,120000.0,120000.0,50.1,'2025-11-21','2026-11-21','Ativa','101','02','07/2026','planilha','2026-08-18 17:37:03.824949');
-INSERT INTO "policies" VALUES(12,'AP-3004','Gustavo Pereira Martins','948.160.372-59','100004','1978-01-30','Morte + Invalidez',250000.0,250000.0,250000.0,102.0,'2025-12-21','2026-12-21','Ativa','101','02','07/2026','planilha','2026-08-18 17:37:03.824950');
-INSERT INTO "policies" VALUES(13,'AP-3005','Juliana Cristina Moraes','503.847.126-91','100005','1993-05-19','Morte + Invalidez',180000.0,180000.0,180000.0,69.6,'2026-01-20','2027-01-20','Ativa','101','01','07/2026','planilha','2026-08-18 17:37:03.824950');
-INSERT INTO "policies" VALUES(14,'AP-3006','Marcelo Augusto Nunes','861.395.704-22','100006','1984-12-11','Morte + Invalidez',100000.0,100000.0,100000.0,42.3,'2026-02-19','2027-02-19','Ativa','101','03','07/2026','planilha','2026-08-18 17:37:03.824950');
-INSERT INTO "policies" VALUES(15,'AP-3007','Patricia Oliveira Costa','429.851.630-17','100007','1988-09-03','Morte + Invalidez',220000.0,220000.0,220000.0,88.7,'2026-03-21','2027-03-21','Ativa','101','01','07/2026','planilha','2026-08-18 17:37:03.824951');
-INSERT INTO "policies" VALUES(16,'AP-3008','Ricardo Mendes Ferreira','796.214.853-64','100008','1975-02-27','Morte + Invalidez',300000.0,300000.0,300000.0,122.0,'2026-04-20','2027-04-20','Ativa','101','02','07/2026','planilha','2026-08-18 17:37:03.824951');
-INSERT INTO "policies" VALUES(17,'AP-3009','Simone Aparecida Lopes','154.762.398-53','100009','1992-10-10','Morte + Invalidez',160000.0,160000.0,160000.0,64.7,'2026-05-20','2027-05-20','Ativa','101','03','07/2026','planilha','2026-08-18 17:37:03.824951');
-INSERT INTO "policies" VALUES(18,'AP-3010','Thiago Rodrigues Barros','682.940.517-85','100010','1980-06-05','Morte + Invalidez',140000.0,140000.0,140000.0,56.9,'2026-06-19','2027-06-19','Ativa','101','01','07/2026','planilha','2026-08-18 17:37:03.824952');
-INSERT INTO "policies" VALUES(19,'AP-4001','Igor Machado','002.978.753-47','304001','1989-07-31','Invalidez',0.0,150000.0,150000.0,60.75,'2025-10-07','2026-10-07','Ativa','101','02','07/2026','gerado','2026-08-18 17:37:03.824952');
-INSERT INTO "policies" VALUES(20,'AP-4002','Juliano Neves','457.178.472-67','304002','2000-02-21','Morte + Invalidez',400000.0,400000.0,400000.0,162.0,'2026-08-17','2027-08-17','Ativa','101','01','07/2026','gerado','2026-08-18 17:37:03.824952');
-INSERT INTO "policies" VALUES(21,'AP-4003','Sabrina Pacheco','627.010.798-19','304003','1968-02-12','Invalidez',0.0,100000.0,100000.0,40.5,'2025-08-17','2026-08-17','Vencida','101','01','07/2026','gerado','2026-08-18 17:37:03.824953');
-INSERT INTO "policies" VALUES(22,'AP-4004','Priscila Dias','452.059.972-83','304004','1977-02-18','Morte + Invalidez',80000.0,80000.0,80000.0,32.4,'2026-05-29','2027-05-29','Ativa','101','02','07/2026','gerado','2026-08-18 17:37:03.824953');
-INSERT INTO "policies" VALUES(23,'AP-4005','Isabela Teixeira','622.948.662-83','304005','1997-11-10','Morte + Invalidez',300000.0,300000.0,300000.0,121.5,'2025-10-05','2026-10-05','Ativa','101','02','07/2026','gerado','2026-08-18 17:37:03.824953');
-INSERT INTO "policies" VALUES(24,'AP-4006','Adriana Dias','500.875.475-17','304006','1986-01-30','Invalidez',0.0,100000.0,100000.0,40.5,'2025-06-05','2026-06-05','Cancelada','101','02','07/2026','gerado','2026-08-18 17:37:03.824954');
-INSERT INTO "policies" VALUES(25,'AP-4007','Karina Esteves','957.931.860-32','304007','1982-03-13','Morte + Invalidez',300000.0,300000.0,300000.0,121.5,'2025-08-23','2026-08-23','A renovar','101','01','07/2026','gerado','2026-08-18 17:37:03.824954');
-INSERT INTO "policies" VALUES(26,'AP-4008','Daniel Oliveira','028.382.226-46','304008','1969-10-03','Morte + Invalidez',150000.0,150000.0,150000.0,60.75,'2026-01-12','2027-01-12','Ativa','101','03','07/2026','gerado','2026-08-18 17:37:03.824954');
-INSERT INTO "policies" VALUES(27,'AP-4009','Emerson Carvalho','247.764.725-87','304009','1986-03-19','Invalidez',0.0,180000.0,180000.0,72.9,'2025-08-13','2026-08-13','Vencida','101','02','07/2026','gerado','2026-08-18 17:37:03.824955');
-INSERT INTO "policies" VALUES(28,'AP-4010','Heitor Queiroz','330.175.682-05','304010','1997-05-28','Morte + Invalidez',180000.0,180000.0,180000.0,72.9,'2026-07-01','2027-07-01','Ativa','101','01','07/2026','gerado','2026-08-18 17:37:03.824955');
-INSERT INTO "policies" VALUES(29,'AP-4011','Alexandre Ramos','319.489.394-94','304011','1977-07-01','Morte + Invalidez',350000.0,350000.0,350000.0,141.75,'2026-06-19','2027-06-19','Cancelada','101','03','07/2026','gerado','2026-08-18 17:37:03.824955');
-INSERT INTO "policies" VALUES(30,'AP-4012','Isabela Dias','105.218.549-14','304012','1993-12-18','Invalidez',0.0,100000.0,100000.0,40.5,'2025-12-19','2026-12-19','Ativa','101','02','07/2026','gerado','2026-08-18 17:37:03.824956');
-INSERT INTO "policies" VALUES(31,'AP-4013','Karina Ismael','460.013.041-18','304013','1983-03-08','Invalidez',0.0,100000.0,100000.0,40.5,'2025-05-17','2026-05-17','Vencida','101','03','07/2026','gerado','2026-08-18 17:37:03.824956');
-INSERT INTO "policies" VALUES(32,'AP-4014','Alexandre Klein','906.593.976-15','304014','1972-04-12','Invalidez',0.0,350000.0,350000.0,141.75,'2026-03-26','2027-03-26','Ativa','101','03','07/2026','gerado','2026-08-18 17:37:03.824956');
-INSERT INTO "policies" VALUES(33,'AP-4015','Rafael Machado','604.541.465-90','304015','1968-08-29','Invalidez',0.0,200000.0,200000.0,81.0,'2025-06-08','2026-06-08','Vencida','101','03','07/2026','gerado','2026-08-18 17:37:03.824957');
-INSERT INTO "policies" VALUES(34,'AP-4016','Yasmin Guimaraes','291.102.859-40','304016','1996-08-06','Morte + Invalidez',80000.0,80000.0,80000.0,32.4,'2026-05-14','2027-05-14','Ativa','101','02','07/2026','gerado','2026-08-18 17:37:03.824957');
-INSERT INTO "policies" VALUES(35,'AP-4017','Isabela Lacerda','632.280.886-42','304017','1990-11-30','Invalidez',0.0,220000.0,220000.0,89.1,'2025-11-19','2026-11-19','Ativa','101','01','07/2026','gerado','2026-08-18 17:37:03.824957');
-INSERT INTO "policies" VALUES(36,'AP-4018','Bruno Almeida','452.912.808-45','304018','1982-11-26','Invalidez',0.0,300000.0,300000.0,121.5,'2026-01-10','2027-01-10','Ativa','101','03','07/2026','gerado','2026-08-18 17:37:03.824957');
-INSERT INTO "policies" VALUES(37,'AP-4019','Wagner Barbosa','703.826.538-45','304019','1990-10-03','Morte + Invalidez',80000.0,80000.0,80000.0,32.4,'2026-03-27','2027-03-27','Ativa','101','01','07/2026','gerado','2026-08-18 17:37:03.824958');
-INSERT INTO "policies" VALUES(38,'AP-4020','Beatriz Lacerda','794.326.270-58','304020','1977-01-11','Invalidez',0.0,400000.0,400000.0,162.0,'2025-12-30','2026-12-30','Cancelada','101','03','07/2026','gerado','2026-08-18 17:37:03.824958');
-INSERT INTO "policies" VALUES(39,'AP-4021','Emerson Barbosa','584.210.839-49','304021','1988-03-26','Morte + Invalidez',120000.0,120000.0,120000.0,48.6,'2025-06-22','2026-06-22','Vencida','101','01','07/2026','gerado','2026-08-18 17:37:03.824958');
-INSERT INTO "policies" VALUES(40,'AP-4022','Debora Machado','281.126.584-40','304022','1972-10-03','Morte + Invalidez',300000.0,300000.0,300000.0,121.5,'2026-06-29','2027-06-29','Ativa','101','03','07/2026','gerado','2026-08-18 17:37:03.824959');
-INSERT INTO "policies" VALUES(41,'AP-4023','Mariana Freitas','526.309.765-82','304023','1988-11-02','Invalidez',0.0,180000.0,180000.0,72.9,'2026-02-11','2027-02-11','Ativa','101','03','07/2026','gerado','2026-08-18 17:37:03.824959');
-INSERT INTO "policies" VALUES(42,'AP-4024','Bruno Freitas','018.051.543-82','304024','1994-04-18','Invalidez',0.0,300000.0,300000.0,121.5,'2025-07-23','2026-07-23','Vencida','101','03','07/2026','gerado','2026-08-18 17:37:03.824959');
-INSERT INTO "policies" VALUES(43,'AP-4025','Priscila Esteves','164.941.577-18','304025','1996-10-30','Morte',200000.0,0.0,200000.0,81.0,'2026-01-13','2027-01-13','Ativa','101','03','07/2026','gerado','2026-08-18 17:37:03.824960');
-INSERT INTO "policies" VALUES(44,'AP-4026','Priscila Lacerda','111.744.325-68','304026','1986-03-02','Morte + Invalidez',250000.0,250000.0,250000.0,101.25,'2026-03-05','2027-03-05','Ativa','101','03','07/2026','gerado','2026-08-18 17:37:03.824960');
-INSERT INTO "policies" VALUES(45,'AP-4027','Yasmin Klein','652.373.556-96','304027','1979-07-11','Morte + Invalidez',400000.0,400000.0,400000.0,162.0,'2026-07-22','2027-07-22','Cancelada','101','01','07/2026','gerado','2026-08-18 17:37:03.824960');
-INSERT INTO "policies" VALUES(46,'AP-4028','Jonas Oliveira','264.515.474-28','304028','1968-08-17','Morte + Invalidez',350000.0,350000.0,350000.0,141.75,'2026-04-11','2027-04-11','Ativa','101','03','07/2026','gerado','2026-08-18 17:37:03.824961');
-INSERT INTO "policies" VALUES(47,'AP-4029','Sabrina Henriques','144.976.608-56','304029','1966-12-31','Invalidez',0.0,120000.0,120000.0,48.6,'2026-02-21','2027-02-21','Ativa','101','02','07/2026','gerado','2026-08-18 17:37:03.824961');
-INSERT INTO "policies" VALUES(48,'AP-4030','Giovana Pacheco','883.655.062-04','304030','1971-09-13','Morte + Invalidez',400000.0,400000.0,400000.0,162.0,'2026-07-14','2027-07-14','Ativa','101','03','07/2026','gerado','2026-08-18 17:37:03.824961');
-INSERT INTO "policies" VALUES(49,'AP-4031','Rafael Esteves','677.500.314-50','304031','1974-03-17','Invalidez',0.0,350000.0,350000.0,141.75,'2026-04-04','2027-04-04','Ativa','101','01','07/2026','gerado','2026-08-18 17:37:03.824962');
-INSERT INTO "policies" VALUES(50,'AP-4032','Helena Queiroz','183.801.253-73','304032','1985-01-28','Invalidez',0.0,350000.0,350000.0,141.75,'2026-03-28','2027-03-28','Ativa','101','03','07/2026','gerado','2026-08-18 17:37:03.824963');
+INSERT INTO "policies" VALUES(1,'AP-2041','Marcos A. Ribeiro','158.813.998-69','200001',NULL,'Morte + Invalidez',250000.0,250000.0,250000.0,101.25,'2025-08-29','2026-08-29','A renovar','101','01','07/2026','prototipo','2026-08-18 17:52:28.750431');
+INSERT INTO "policies" VALUES(2,'AP-1899','Sonia R. Batista','879.730.911-41','200002',NULL,'Invalidez',0.0,100000.0,100000.0,40.5,'2025-08-31','2026-08-31','A renovar','101','01','07/2026','prototipo','2026-08-18 17:52:28.750433');
+INSERT INTO "policies" VALUES(3,'AP-1987','Fernanda C. Lima','707.536.455-68','200003',NULL,'Morte',180000.0,0.0,180000.0,72.9,'2025-09-04','2026-09-04','A renovar','101','01','07/2026','prototipo','2026-08-18 17:52:28.750434');
+INSERT INTO "policies" VALUES(4,'AP-2115','Joao P. Andrade','151.884.472-94','200004',NULL,'Invalidez',0.0,120000.0,120000.0,48.6,'2024-09-12','2026-09-12','A renovar','101','01','07/2026','prototipo','2026-08-18 17:52:28.750434');
+INSERT INTO "policies" VALUES(5,'AP-2033','Claudia M. Souza','055.761.698-71','200005',NULL,'Morte + Invalidez',300000.0,300000.0,300000.0,121.5,'2025-09-20','2026-09-20','Ativa','101','01','07/2026','prototipo','2026-08-18 17:52:28.750434');
+INSERT INTO "policies" VALUES(6,'AP-1954','Roberto Nunes','689.768.469-78','200006',NULL,'Morte',200000.0,0.0,200000.0,81.0,'2026-03-09','2027-03-09','Ativa','101','01','07/2026','prototipo','2026-08-18 17:52:28.750435');
+INSERT INTO "policies" VALUES(7,'AP-2087','Patricia Gomes','809.320.819-67','200007',NULL,'Morte + Invalidez',350000.0,350000.0,350000.0,141.75,'2026-04-23','2027-04-23','Ativa','101','01','07/2026','prototipo','2026-08-18 17:52:28.750435');
+INSERT INTO "policies" VALUES(8,'AP-2160','Eduardo Tavares','273.177.848-64','200008',NULL,'Morte',150000.0,0.0,150000.0,60.75,'2026-07-16','2027-07-16','Ativa','101','01','07/2026','prototipo','2026-08-18 17:52:28.750435');
+INSERT INTO "policies" VALUES(9,'AP-3001','Ana Beatriz Souza','384.517.920-41','100001','1986-03-15','Morte + Invalidez',150000.0,150000.0,150000.0,60.7,'2025-09-22','2026-09-22','Ativa','101','01','07/2026','planilha','2026-08-18 17:52:28.750436');
+INSERT INTO "policies" VALUES(10,'AP-3002','Carlos Henrique Lima','617.283.945-08','100002','1981-11-22','Morte + Invalidez',200000.0,200000.0,200000.0,81.1,'2025-10-22','2026-10-22','Ativa','101','01','07/2026','planilha','2026-08-18 17:52:28.750436');
+INSERT INTO "policies" VALUES(11,'AP-3003','Fernanda Alves Rocha','275.619.438-70','100003','1990-07-08','Morte + Invalidez',120000.0,120000.0,120000.0,50.1,'2025-11-21','2026-11-21','Ativa','101','02','07/2026','planilha','2026-08-18 17:52:28.750436');
+INSERT INTO "policies" VALUES(12,'AP-3004','Gustavo Pereira Martins','948.160.372-59','100004','1978-01-30','Morte + Invalidez',250000.0,250000.0,250000.0,102.0,'2025-12-21','2026-12-21','Ativa','101','02','07/2026','planilha','2026-08-18 17:52:28.750437');
+INSERT INTO "policies" VALUES(13,'AP-3005','Juliana Cristina Moraes','503.847.126-91','100005','1993-05-19','Morte + Invalidez',180000.0,180000.0,180000.0,69.6,'2026-01-20','2027-01-20','Ativa','101','01','07/2026','planilha','2026-08-18 17:52:28.750437');
+INSERT INTO "policies" VALUES(14,'AP-3006','Marcelo Augusto Nunes','861.395.704-22','100006','1984-12-11','Morte + Invalidez',100000.0,100000.0,100000.0,42.3,'2026-02-19','2027-02-19','Ativa','101','03','07/2026','planilha','2026-08-18 17:52:28.750437');
+INSERT INTO "policies" VALUES(15,'AP-3007','Patricia Oliveira Costa','429.851.630-17','100007','1988-09-03','Morte + Invalidez',220000.0,220000.0,220000.0,88.7,'2026-03-21','2027-03-21','Ativa','101','01','07/2026','planilha','2026-08-18 17:52:28.750438');
+INSERT INTO "policies" VALUES(16,'AP-3008','Ricardo Mendes Ferreira','796.214.853-64','100008','1975-02-27','Morte + Invalidez',300000.0,300000.0,300000.0,122.0,'2026-04-20','2027-04-20','Ativa','101','02','07/2026','planilha','2026-08-18 17:52:28.750438');
+INSERT INTO "policies" VALUES(17,'AP-3009','Simone Aparecida Lopes','154.762.398-53','100009','1992-10-10','Morte + Invalidez',160000.0,160000.0,160000.0,64.7,'2026-05-20','2027-05-20','Ativa','101','03','07/2026','planilha','2026-08-18 17:52:28.750439');
+INSERT INTO "policies" VALUES(18,'AP-3010','Thiago Rodrigues Barros','682.940.517-85','100010','1980-06-05','Morte + Invalidez',140000.0,140000.0,140000.0,56.9,'2026-06-19','2027-06-19','Ativa','101','01','07/2026','planilha','2026-08-18 17:52:28.750439');
+INSERT INTO "policies" VALUES(19,'AP-4001','Igor Machado','002.978.753-47','304001','1989-07-31','Invalidez',0.0,150000.0,150000.0,60.75,'2025-10-07','2026-10-07','Ativa','101','02','07/2026','gerado','2026-08-18 17:52:28.750439');
+INSERT INTO "policies" VALUES(20,'AP-4002','Juliano Neves','457.178.472-67','304002','2000-02-21','Morte + Invalidez',400000.0,400000.0,400000.0,162.0,'2026-08-17','2027-08-17','Ativa','101','01','07/2026','gerado','2026-08-18 17:52:28.750440');
+INSERT INTO "policies" VALUES(21,'AP-4003','Sabrina Pacheco','627.010.798-19','304003','1968-02-12','Invalidez',0.0,100000.0,100000.0,40.5,'2025-08-17','2026-08-17','Vencida','101','01','07/2026','gerado','2026-08-18 17:52:28.750440');
+INSERT INTO "policies" VALUES(22,'AP-4004','Priscila Dias','452.059.972-83','304004','1977-02-18','Morte + Invalidez',80000.0,80000.0,80000.0,32.4,'2026-05-29','2027-05-29','Ativa','101','02','07/2026','gerado','2026-08-18 17:52:28.750440');
+INSERT INTO "policies" VALUES(23,'AP-4005','Isabela Teixeira','622.948.662-83','304005','1997-11-10','Morte + Invalidez',300000.0,300000.0,300000.0,121.5,'2025-10-05','2026-10-05','Ativa','101','02','07/2026','gerado','2026-08-18 17:52:28.750441');
+INSERT INTO "policies" VALUES(24,'AP-4006','Adriana Dias','500.875.475-17','304006','1986-01-30','Invalidez',0.0,100000.0,100000.0,40.5,'2025-06-05','2026-06-05','Cancelada','101','02','07/2026','gerado','2026-08-18 17:52:28.750441');
+INSERT INTO "policies" VALUES(25,'AP-4007','Karina Esteves','957.931.860-32','304007','1982-03-13','Morte + Invalidez',300000.0,300000.0,300000.0,121.5,'2025-08-23','2026-08-23','A renovar','101','01','07/2026','gerado','2026-08-18 17:52:28.750441');
+INSERT INTO "policies" VALUES(26,'AP-4008','Daniel Oliveira','028.382.226-46','304008','1969-10-03','Morte + Invalidez',150000.0,150000.0,150000.0,60.75,'2026-01-12','2027-01-12','Ativa','101','03','07/2026','gerado','2026-08-18 17:52:28.750442');
+INSERT INTO "policies" VALUES(27,'AP-4009','Emerson Carvalho','247.764.725-87','304009','1986-03-19','Invalidez',0.0,180000.0,180000.0,72.9,'2025-08-13','2026-08-13','Vencida','101','02','07/2026','gerado','2026-08-18 17:52:28.750443');
+INSERT INTO "policies" VALUES(28,'AP-4010','Heitor Queiroz','330.175.682-05','304010','1997-05-28','Morte + Invalidez',180000.0,180000.0,180000.0,72.9,'2026-07-01','2027-07-01','Ativa','101','01','07/2026','gerado','2026-08-18 17:52:28.750443');
+INSERT INTO "policies" VALUES(29,'AP-4011','Alexandre Ramos','319.489.394-94','304011','1977-07-01','Morte + Invalidez',350000.0,350000.0,350000.0,141.75,'2026-06-19','2027-06-19','Cancelada','101','03','07/2026','gerado','2026-08-18 17:52:28.750443');
+INSERT INTO "policies" VALUES(30,'AP-4012','Isabela Dias','105.218.549-14','304012','1993-12-18','Invalidez',0.0,100000.0,100000.0,40.5,'2025-12-19','2026-12-19','Ativa','101','02','07/2026','gerado','2026-08-18 17:52:28.750444');
+INSERT INTO "policies" VALUES(31,'AP-4013','Karina Ismael','460.013.041-18','304013','1983-03-08','Invalidez',0.0,100000.0,100000.0,40.5,'2025-05-17','2026-05-17','Vencida','101','03','07/2026','gerado','2026-08-18 17:52:28.750444');
+INSERT INTO "policies" VALUES(32,'AP-4014','Alexandre Klein','906.593.976-15','304014','1972-04-12','Invalidez',0.0,350000.0,350000.0,141.75,'2026-03-26','2027-03-26','Ativa','101','03','07/2026','gerado','2026-08-18 17:52:28.750444');
+INSERT INTO "policies" VALUES(33,'AP-4015','Rafael Machado','604.541.465-90','304015','1968-08-29','Invalidez',0.0,200000.0,200000.0,81.0,'2025-06-08','2026-06-08','Vencida','101','03','07/2026','gerado','2026-08-18 17:52:28.750445');
+INSERT INTO "policies" VALUES(34,'AP-4016','Yasmin Guimaraes','291.102.859-40','304016','1996-08-06','Morte + Invalidez',80000.0,80000.0,80000.0,32.4,'2026-05-14','2027-05-14','Ativa','101','02','07/2026','gerado','2026-08-18 17:52:28.750446');
+INSERT INTO "policies" VALUES(35,'AP-4017','Isabela Lacerda','632.280.886-42','304017','1990-11-30','Invalidez',0.0,220000.0,220000.0,89.1,'2025-11-19','2026-11-19','Ativa','101','01','07/2026','gerado','2026-08-18 17:52:28.750446');
+INSERT INTO "policies" VALUES(36,'AP-4018','Bruno Almeida','452.912.808-45','304018','1982-11-26','Invalidez',0.0,300000.0,300000.0,121.5,'2026-01-10','2027-01-10','Ativa','101','03','07/2026','gerado','2026-08-18 17:52:28.750447');
+INSERT INTO "policies" VALUES(37,'AP-4019','Wagner Barbosa','703.826.538-45','304019','1990-10-03','Morte + Invalidez',80000.0,80000.0,80000.0,32.4,'2026-03-27','2027-03-27','Ativa','101','01','07/2026','gerado','2026-08-18 17:52:28.750447');
+INSERT INTO "policies" VALUES(38,'AP-4020','Beatriz Lacerda','794.326.270-58','304020','1977-01-11','Invalidez',0.0,400000.0,400000.0,162.0,'2025-12-30','2026-12-30','Cancelada','101','03','07/2026','gerado','2026-08-18 17:52:28.750448');
+INSERT INTO "policies" VALUES(39,'AP-4021','Emerson Barbosa','584.210.839-49','304021','1988-03-26','Morte + Invalidez',120000.0,120000.0,120000.0,48.6,'2025-06-22','2026-06-22','Vencida','101','01','07/2026','gerado','2026-08-18 17:52:28.750448');
+INSERT INTO "policies" VALUES(40,'AP-4022','Debora Machado','281.126.584-40','304022','1972-10-03','Morte + Invalidez',300000.0,300000.0,300000.0,121.5,'2026-06-29','2027-06-29','Ativa','101','03','07/2026','gerado','2026-08-18 17:52:28.750448');
+INSERT INTO "policies" VALUES(41,'AP-4023','Mariana Freitas','526.309.765-82','304023','1988-11-02','Invalidez',0.0,180000.0,180000.0,72.9,'2026-02-11','2027-02-11','Ativa','101','03','07/2026','gerado','2026-08-18 17:52:28.750449');
+INSERT INTO "policies" VALUES(42,'AP-4024','Bruno Freitas','018.051.543-82','304024','1994-04-18','Invalidez',0.0,300000.0,300000.0,121.5,'2025-07-23','2026-07-23','Vencida','101','03','07/2026','gerado','2026-08-18 17:52:28.750449');
+INSERT INTO "policies" VALUES(43,'AP-4025','Priscila Esteves','164.941.577-18','304025','1996-10-30','Morte',200000.0,0.0,200000.0,81.0,'2026-01-13','2027-01-13','Ativa','101','03','07/2026','gerado','2026-08-18 17:52:28.750449');
+INSERT INTO "policies" VALUES(44,'AP-4026','Priscila Lacerda','111.744.325-68','304026','1986-03-02','Morte + Invalidez',250000.0,250000.0,250000.0,101.25,'2026-03-05','2027-03-05','Ativa','101','03','07/2026','gerado','2026-08-18 17:52:28.750450');
+INSERT INTO "policies" VALUES(45,'AP-4027','Yasmin Klein','652.373.556-96','304027','1979-07-11','Morte + Invalidez',400000.0,400000.0,400000.0,162.0,'2026-07-22','2027-07-22','Cancelada','101','01','07/2026','gerado','2026-08-18 17:52:28.750450');
+INSERT INTO "policies" VALUES(46,'AP-4028','Jonas Oliveira','264.515.474-28','304028','1968-08-17','Morte + Invalidez',350000.0,350000.0,350000.0,141.75,'2026-04-11','2027-04-11','Ativa','101','03','07/2026','gerado','2026-08-18 17:52:28.750450');
+INSERT INTO "policies" VALUES(47,'AP-4029','Sabrina Henriques','144.976.608-56','304029','1966-12-31','Invalidez',0.0,120000.0,120000.0,48.6,'2026-02-21','2027-02-21','Ativa','101','02','07/2026','gerado','2026-08-18 17:52:28.750451');
+INSERT INTO "policies" VALUES(48,'AP-4030','Giovana Pacheco','883.655.062-04','304030','1971-09-13','Morte + Invalidez',400000.0,400000.0,400000.0,162.0,'2026-07-14','2027-07-14','Ativa','101','03','07/2026','gerado','2026-08-18 17:52:28.750451');
+INSERT INTO "policies" VALUES(49,'AP-4031','Rafael Esteves','677.500.314-50','304031','1974-03-17','Invalidez',0.0,350000.0,350000.0,141.75,'2026-04-04','2027-04-04','Ativa','101','01','07/2026','gerado','2026-08-18 17:52:28.750451');
+INSERT INTO "policies" VALUES(50,'AP-4032','Helena Queiroz','183.801.253-73','304032','1985-01-28','Invalidez',0.0,350000.0,350000.0,141.75,'2026-03-28','2027-03-28','Ativa','101','03','07/2026','gerado','2026-08-18 17:52:28.750452');
 CREATE TABLE proposals (
 	id INTEGER NOT NULL, 
 	numero VARCHAR(20) NOT NULL, 
@@ -267,7 +267,7 @@ CREATE TABLE settings (
 	atualizado_em DATETIME NOT NULL, 
 	PRIMARY KEY (id)
 );
-INSERT INTO "settings" VALUES(1,'exigir_email_autorizado','nao','2026-08-18 17:37:03.812395');
+INSERT INTO "settings" VALUES(1,'exigir_email_autorizado','nao','2026-08-18 17:52:28.736316');
 CREATE TABLE users (
 	id INTEGER NOT NULL, 
 	nome VARCHAR(120) NOT NULL, 
@@ -278,14 +278,16 @@ CREATE TABLE users (
 	criado_em DATETIME NOT NULL, 
 	PRIMARY KEY (id)
 );
-INSERT INTO "users" VALUES(1,'Estipulante','estipulante@sebraeprev.com.br','$2b$12$ka4J2JG8car0lz91NE1LWuPWCCMlk7pvYcdPqiNlNePvBwJS4sdCe','ESTIPULANTE',1,'2026-08-18 17:37:03.799898');
-INSERT INTO "users" VALUES(2,'Corretora','corretora@sebraeprev.com.br','$2b$12$FidkO/uU.tI0E7B8W6irA.FOOtbOesLo6YoafR3fJWmsroP7OkLoO','CORRETORA',1,'2026-08-18 17:37:03.799902');
-INSERT INTO "users" VALUES(3,'Seguradora','seguradora@sebraeprev.com.br','$2b$12$iJpsGV5BcDO/jI0aoySJpun9ON79.vCDee68T7q/Da9/H5TNNlHDS','SEGURADORA',1,'2026-08-18 17:37:03.799903');
+INSERT INTO "users" VALUES(1,'Estipulante','estipulante@sebraeprev.com.br','$2b$12$XdPSRoGs7RPUDHLx5JxpoeE2jIzG7/BQG99VpIckR9laQUg5gF9Yy','ESTIPULANTE',1,'2026-08-18 17:52:28.704889');
+INSERT INTO "users" VALUES(2,'Corretora','corretora@sebraeprev.com.br','$2b$12$efq7ZrjEOL9DBChAjua7b.Jcj2Va27XQFPur2J6CJFetl2UDD9a9K','CORRETORA',1,'2026-08-18 17:52:28.704893');
+INSERT INTO "users" VALUES(3,'Seguradora','seguradora@sebraeprev.com.br','$2b$12$dhFGLjes36mfCeziRYspJe1xuq1XpqpjpQXtpWfKh/xyH6d2T.ODG','SEGURADORA',1,'2026-08-18 17:52:28.704894');
 CREATE UNIQUE INDEX ix_users_email ON users (email);
-CREATE INDEX ix_policies_participante ON policies (participante);
 CREATE INDEX ix_policies_status ON policies (status);
-CREATE UNIQUE INDEX ix_policies_numero_apolice ON policies (numero_apolice);
+CREATE INDEX ix_policies_participante ON policies (participante);
 CREATE INDEX ix_policies_data_vencimento ON policies (data_vencimento);
+CREATE UNIQUE INDEX ix_policies_numero_apolice ON policies (numero_apolice);
+CREATE UNIQUE INDEX ix_authorized_emails_valor ON authorized_emails (valor);
+CREATE UNIQUE INDEX ix_settings_chave ON settings (chave);
 CREATE INDEX ix_payments_status ON payments (status);
 CREATE INDEX ix_payments_competencia ON payments (competencia);
 CREATE INDEX ix_commissions_competencia ON commissions (competencia);
@@ -294,6 +296,4 @@ CREATE INDEX ix_claims_status ON claims (status);
 CREATE INDEX ix_pendencies_prioridade ON pendencies (prioridade);
 CREATE INDEX ix_invoices_status ON invoices (status);
 CREATE INDEX ix_invoices_competencia ON invoices (competencia);
-CREATE UNIQUE INDEX ix_authorized_emails_valor ON authorized_emails (valor);
-CREATE UNIQUE INDEX ix_settings_chave ON settings (chave);
 COMMIT;

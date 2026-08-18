@@ -236,6 +236,20 @@ mesmos status da tela original — hoje e daqui a anos.
 
 ---
 
+## Colocar no ar
+
+O passo a passo completo esta em **[DEPLOY.md](DEPLOY.md)**.
+
+Resumo: o projeto ja traz o `render.yaml`, entao no Render basta
+**New + → Blueprint → escolher o repositorio**. Ele pergunta as 3 senhas
+e publica sozinho.
+
+⚠️ **Antes de subir dados reais**, leia o aviso sobre LGPD no comeco do
+DEPLOY.md. Para dados de participantes reais, o sistema precisa ir para a
+infraestrutura homologada do Sebrae Previdencia.
+
+---
+
 ## Status do desenvolvimento
 
 - [x] **Fase 1** — analise do prototipo e preparacao do ambiente

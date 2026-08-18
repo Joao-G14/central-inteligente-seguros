@@ -1,0 +1,69 @@
+# ===================================================================
+# render.yaml — receita de publicacao no Render
+# ===================================================================
+# Este arquivo diz ao Render COMO instalar e COMO ligar o sistema.
+# Com ele, voce nao precisa digitar os comandos na mao no painel.
+#
+# COMO USAR:
+#   1. entre em https://dashboard.render.com
+#   2. New +  ->  Blueprint
+#   3. escolha o repositorio central-inteligente-seguros
+#   4. o Render le este arquivo e monta tudo sozinho
+#   5. ele vai PEDIR as senhas (os campos marcados com sync: false)
+#
+# Se preferir criar na mao, use o passo a passo do DEPLOY.md.
+# ===================================================================
+
+services:
+  - type: web
+    name: central-inteligente-seguros
+    runtime: python
+    plan: free
+    region: oregon
+
+    # Instala as bibliotecas do requirements.txt
+    buildCommand: pip install -r requirements.txt
+
+    # Liga o servidor.
+    #   --host 0.0.0.0  aceita conexoes de fora (sem isso, so a propria
+    #                   maquina do servidor conseguiria abrir o site)
+    #   --port $PORT    o Render escolhe a porta e avisa nesta variavel
+    # NAO use --reload aqui: ele existe so para desenvolvimento.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+
+    # O Render chama este endereco para saber se o site esta de pe.
+    healthCheckPath: /login
+
+    envVars:
+      # --- Avisa ao sistema que ele esta em producao ---
+      # Liga a exigencia de HTTPS no cookie de sessao.
+      - key: AMBIENTE
+        value: producao
+
+      # --- Chaves secretas ---
+      # generateValue: true faz o Render sortear um valor aleatorio e
+      # guardar em segredo. Melhor do que voce inventar uma chave.
+      - key: SECRET_KEY
+        generateValue: true
+      - key: API_KEY
+        generateValue: true
+
+      # --- Senhas de acesso ---
+      # sync: false significa: o Render PERGUNTA o valor na hora de
+      # criar, e nao guarda nada aqui no arquivo (que vai para o GitHub).
+      - key: SENHA_ESTIPULANTE
+        sync: false
+      - key: SENHA_CORRETORA
+        sync: false
+      - key: SENHA_SEGURADORA
+        sync: false
+
+      # --- Dados de demonstracao ---
+      # "sim" sobe com as 50 apolices de exemplo (bom para demonstrar).
+      # Troque para "nao" quando for usar com dados reais.
+      - key: CARREGAR_DADOS_DEMO
+        value: "sim"
+
+      # Cria as tabelas sozinho ao ligar. Deixe "sim".
+      - key: CRIAR_BANCO_AO_INICIAR
+        value: "sim"

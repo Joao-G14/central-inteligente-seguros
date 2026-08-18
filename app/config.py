@@ -73,8 +73,23 @@ EM_PRODUCAO = AMBIENTE == "producao"
 # desligado — senao o login nao funcionaria localmente.
 COOKIE_SEGURO = EM_PRODUCAO
 
-# Se True, o sistema cria as tabelas e carrega os dados iniciais sozinho
-# ao ligar. E o que permite subir num servidor sem rodar comando nenhum.
-CRIAR_BANCO_AO_INICIAR = ler("CRIAR_BANCO_AO_INICIAR", "sim").lower() in (
-    "sim", "true", "1", "yes"
-)
+def _e_sim(valor: str) -> bool:
+    """Entende 'sim', 'true', '1' e 'yes' como verdadeiro."""
+    return valor.strip().lower() in ("sim", "true", "1", "yes")
+
+
+# Se True, o sistema cria as tabelas sozinho ao ligar.
+# E o que permite subir num servidor sem rodar comando nenhum.
+CRIAR_BANCO_AO_INICIAR = _e_sim(ler("CRIAR_BANCO_AO_INICIAR", "sim"))
+
+# Carregar tambem os DADOS DE DEMONSTRACAO (50 apolices, sinistros,
+# comissoes, propostas...)?
+#
+#   "sim" -> util para desenvolver, testar e demonstrar o sistema
+#   "nao" -> o sistema sobe VAZIO, so com as 3 categorias de acesso e o
+#            controle de acesso. E o que voce quer quando for comecar a
+#            usar com dados reais: a carteira entra pela planilha ou
+#            pela API, sem nenhum registro inventado no meio.
+#
+# So tem efeito quando o banco esta vazio. Nunca apaga o que ja existe.
+CARREGAR_DADOS_DEMO = _e_sim(ler("CARREGAR_DADOS_DEMO", "sim"))
