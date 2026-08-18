@@ -60,14 +60,22 @@ async function enviarPergunta(evento) {
   if (evento) evento.preventDefault();
 
   const campo = document.getElementById('campoPergunta');
+  const botao = document.getElementById('botaoEnviar');
   const pergunta = campo.value.trim();
   if (!pergunta) return;
 
   adicionarMensagem(pergunta, 'me');
   campo.value = '';
 
-  // Mensagem provisoria enquanto o servidor responde.
-  const aguardando = adicionarMensagem('Consultando o banco…', 'bot');
+  // Trava o campo enquanto espera, para nao enviar duas perguntas juntas.
+  campo.disabled = true;
+  if (botao) { botao.disabled = true; botao.innerText = 'Pensando…'; }
+
+  // Bolinhas animadas enquanto o assistente responde.
+  const aguardando = adicionarMensagem(
+    '<span class="digitando"><span></span><span></span><span></span></span>',
+    'bot'
+  );
 
   try {
     // FormData monta o envio no mesmo formato de um formulario comum.
@@ -84,6 +92,10 @@ async function enviarPergunta(evento) {
   } catch (erro) {
     aguardando.innerHTML =
       'Não consegui falar com o servidor. Ele ainda está rodando?';
+  } finally {
+    campo.disabled = false;
+    if (botao) { botao.disabled = false; botao.innerText = 'Enviar'; }
+    campo.focus();
   }
 
   rolarParaOFim();

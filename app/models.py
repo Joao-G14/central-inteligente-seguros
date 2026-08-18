@@ -20,6 +20,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
 )
 from sqlalchemy.orm import relationship
 
@@ -288,6 +289,45 @@ class Setting(Base):
 
 # A chave que liga/desliga a exigencia da lista de acesso.
 CHAVE_EXIGIR_AUTORIZACAO = "exigir_email_autorizado"
+
+
+# ===============================================================
+# TABELA 3d: chat_messages  (a memoria do assistente)
+# ===============================================================
+class ChatMessage(Base):
+    """
+    Cada linha e uma fala da conversa com o assistente.
+
+    POR QUE GUARDAR
+    Sem memoria, cada pergunta comeca do zero e nao da para perguntar
+    "e no mes passado?" logo depois de "quanto foi a comissao de julho?".
+    Guardando o historico, o assistente entende o que "e no mes passado"
+    quer dizer.
+
+    A conversa e separada por E-MAIL: cada pessoa tem a sua, e ninguem
+    ve a conversa de outra.
+    """
+
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True)
+
+    # De quem e esta conversa (o e-mail informado no login).
+    usuario_email = Column(String(120), nullable=False, index=True)
+
+    # "user" = a pessoa · "assistant" = o assistente
+    papel = Column(String(12), nullable=False)
+
+    conteudo = Column(Text, nullable=False)
+
+    # "ia" (respondeu o Claude) ou "regras" (respondeu o assistente.py).
+    # Fica so nas respostas; nas perguntas da pessoa e None.
+    origem = Column(String(10), nullable=True)
+
+    criado_em = Column(DateTime, nullable=False, default=datetime.now, index=True)
+
+    def __repr__(self):
+        return f"<ChatMessage {self.papel}: {self.conteudo[:40]}>"
 
 
 # ===============================================================

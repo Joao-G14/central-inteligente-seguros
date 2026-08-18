@@ -1,36 +1,76 @@
 {# ==================================================================
-   assistente.html — Assistente da Central
+   assistente.html — a conversa com o assistente
    ==================================================================
-   Um assistente de perguntas e respostas.
-
-   IMPORTANTE, para nao haver confusao: isto NAO e inteligencia
-   artificial. E uma busca por palavras-chave — o programa procura
-   certas palavras na pergunta e responde com dados consultados no
-   banco na hora. A logica esta em app/assistente.py.
+   A conversa fica guardada no banco (tabela chat_messages), separada
+   por e-mail. Ao abrir a tela, as falas anteriores voltam.
    ================================================================== #}
 {% extends "base.html" %}
 
 {% block titulo %}Assistente — Central de Seguros{% endblock %}
 {% block cabecalho %}Assistente da Central{% endblock %}
-{% block subcabecalho %}Perguntas sobre a carteira, respondidas com os dados do banco{% endblock %}
+{% block subcabecalho %}Pergunte sobre a carteira, a operação ou os conceitos do seguro{% endblock %}
 
 {% block conteudo %}
 
   <div class="chat">
     <div class="chat-head">
       <div class="ai">✦</div>
-      <div>
+      <div style="flex:1">
         <b>Assistente da Central</b>
-        <span>Consulta apólices, renovações, sinistros, comissões e pendências</span>
+        <span>
+          {% if usando_ia %}
+            Consulta a carteira e responde em linguagem natural
+          {% else %}
+            Modo básico — responde por palavras-chave
+          {% endif %}
+        </span>
       </div>
+
+      {# Selo indicando qual motor está respondendo #}
+      {% if usando_ia %}
+        <span class="selo-ia">IA ativa</span>
+      {% else %}
+        <span class="selo-ia basico" title="Configure ANTHROPIC_API_KEY no .env para ativar a IA">
+          Modo básico
+        </span>
+      {% endif %}
+
+      {% if conversa %}
+        <form method="post" action="/assistente/limpar"
+              onsubmit="return confirm('Apagar toda a conversa? Isso não pode ser desfeito.')">
+          <button type="submit" class="btn-limpar" title="Apagar a conversa">Limpar</button>
+        </form>
+      {% endif %}
     </div>
 
     <div class="msgs" id="mensagens">
-      <div class="msg bot">
-        Olá, {{ usuario.nome.split()[0] }}! 👋 Sou o assistente da Central.
-        Posso consultar <b>apólices, renovações, sinistros, inadimplência,
-        comissões e pendências</b>. O que você precisa saber?
-      </div>
+
+      {# --- Saudação inicial, só quando não há conversa --- #}
+      {% if not conversa %}
+        <div class="msg bot">
+          Olá, {{ (usuario.email_acesso or usuario.nome).split('@')[0].split('.')[0]|capitalize }}! 👋
+          Sou o assistente da <b>Central Inteligente de Seguros</b>.
+          {% if usando_ia %}
+            Posso consultar a carteira, comparar números e explicar os termos do
+            seguro. Pergunte do jeito que preferir.
+          {% else %}
+            Posso consultar <b>apólices, renovações, sinistros, inadimplência,
+            comissões e pendências</b>, e explicar os termos do seguro.
+          {% endif %}
+        </div>
+      {% endif %}
+
+      {# --- As falas anteriores --- #}
+      {% for fala in conversa %}
+        {% if fala.papel == 'user' %}
+          <div class="msg me">{{ fala.conteudo }}</div>
+        {% else %}
+          {# |safe porque a resposta vem com HTML (negrito, tabelas).
+             O conteúdo é gerado pelo nosso servidor, não pelo visitante. #}
+          <div class="msg bot">{{ fala.conteudo|safe }}</div>
+        {% endif %}
+      {% endfor %}
+
     </div>
 
     {# Perguntas prontas: clicar em uma envia direto. #}
@@ -41,9 +81,23 @@
     </div>
 
     <form class="composer" onsubmit="enviarPergunta(event)">
-      <input type="text" id="campoPergunta" placeholder="Digite sua pergunta…" autocomplete="off">
-      <button type="submit">Enviar</button>
+      <input type="text" id="campoPergunta" placeholder="Digite sua pergunta…"
+             autocomplete="off" autofocus>
+      <button type="submit" id="botaoEnviar">Enviar</button>
     </form>
   </div>
+
+  {% if not usando_ia %}
+    <p class="dica" style="max-width:900px;margin:14px auto 0">
+      💡 <b>Modo básico ativo.</b> O assistente está respondendo por
+      palavras-chave. Para ativar a inteligência artificial, crie uma chave
+      em <code>console.anthropic.com</code> e adicione
+      <code>ANTHROPIC_API_KEY=...</code> ao arquivo <code>.env</code>.
+      Veja o <b>README.md</b> para o passo a passo.
+    </p>
+  {% endif %}
+
+  {# Faz a conversa já abrir mostrando a última mensagem. #}
+  <script>document.addEventListener('DOMContentLoaded', rolarParaOFim);</script>
 
 {% endblock %}

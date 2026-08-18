@@ -51,7 +51,7 @@ ARQUIVO_SQL = PASTA_RAIZ / "sql" / "banco.sql"
 sorteio = random.Random(2026)
 
 # Quantas apolices no total.
-TOTAL_APOLICES = 50
+TOTAL_APOLICES = 100
 
 # Relacao aproximada entre premio mensal e capital, tirada da planilha
 # Base_Segurados_Central.xlsx (ex.: R$ 60,70 de premio para R$ 150.000).

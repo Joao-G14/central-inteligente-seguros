@@ -155,15 +155,43 @@ Todas as 11 telas do prototipo estao funcionando, lendo dados do banco.
 - **Busca nas tabelas** — filtra sem recarregar a pagina
 - **Assistente** — consulta o banco na hora para responder
 
-### Sobre o "Assistente"
+### Sobre o Assistente
 
-Ele **nao e inteligencia artificial**. E uma busca por palavras-chave:
-o programa procura certas palavras na pergunta e responde consultando o
-banco. A logica esta em `app/assistente.py` e da para ler inteira em
-5 minutos. Por isso o menu diz "Assistente" e nao "Assistente IA".
+Ele tem **dois motores**, e escolhe sozinho qual usar:
 
-Sabe responder sobre: apolices, renovacoes, capital segurado, sinistros,
-inadimplencia, comissoes, pendencias, pagamentos e esteira de propostas.
+| Motor | Arquivo | Quando roda |
+|---|---|---|
+| **IA de verdade** (Claude Opus 5) | `app/assistente_ia.py` | quando ha uma `ANTHROPIC_API_KEY` no `.env` |
+| **Palavras-chave** | `app/assistente.py` | sem chave, ou se a IA falhar |
+
+Com a IA ligada, ele entende qualquer jeito de perguntar, conversa,
+compara numeros e lembra do que foi dito antes. A IA nao tem acesso
+direto ao banco: ela usa **8 ferramentas** que apenas LEEM
+(apolices, sinistros, inadimplencia, comissoes, pagamentos, pendencias,
+propostas e o resumo da carteira). Ela nao consegue alterar nem apagar nada.
+
+Sem a chave, o modo por palavras-chave assume e ninguem fica sem resposta.
+
+A conversa fica guardada por pessoa (tabela `chat_messages`) e ha um
+botao **Limpar** para recomecar.
+
+#### Como ligar a IA
+
+1. crie uma conta em https://console.anthropic.com
+2. gere uma chave de API
+3. coloque no arquivo `.env`:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+4. reinicie o servidor
+
+O selo no topo da conversa mostra qual motor esta ativo: **IA ativa** ou
+**Modo basico**.
+
+> Cada pergunta a IA tem um custo (fracoes de centavo). Confira os precos
+> atuais no site da Anthropic.
 
 ---
 

@@ -1441,6 +1441,69 @@ tr:hover td {
 
 .composer button:hover { background: var(--navy); }
 
+.composer button:disabled,
+.composer input:disabled {
+  opacity: .6;
+  cursor: default;
+}
+
+/* Selo que mostra qual motor esta respondendo */
+.selo-ia {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, .22);
+  color: #fff;
+  white-space: nowrap;
+  letter-spacing: .3px;
+}
+
+.selo-ia.basico {
+  background: rgba(255, 255, 255, .12);
+  color: #CBD9F4;
+  cursor: help;
+}
+
+.btn-limpar {
+  background: rgba(255, 255, 255, .14);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.btn-limpar:hover {
+  background: rgba(255, 255, 255, .28);
+}
+
+/* Bolinhas animadas de "pensando" */
+.digitando {
+  display: inline-flex;
+  gap: 5px;
+  padding: 2px 0;
+}
+
+.digitando span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--blue2);
+  animation: piscar 1.2s infinite;
+}
+
+.digitando span:nth-child(2) { animation-delay: .2s; }
+.digitando span:nth-child(3) { animation-delay: .4s; }
+
+@keyframes piscar {
+  0%, 60%, 100% { opacity: .3; }
+  30% { opacity: 1; }
+}
+
 /* --- Rodape de total nas tabelas --- */
 tfoot td {
   font-weight: 700;

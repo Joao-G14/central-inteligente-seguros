@@ -60,6 +60,21 @@ SENHA_SEGURADORA = ler("SENHA_SEGURADORA", "seguradora@sebraeprev")
 # Quem nao mandar esta chave no cabecalho X-API-Key recebe "401 nao autorizado".
 API_KEY = ler("API_KEY", "")
 
+# --- Assistente com inteligencia artificial ---
+#
+# Chave da Anthropic, criada em https://console.anthropic.com
+# COM a chave  -> o assistente vira uma IA de verdade, que entende
+#                 qualquer jeito de perguntar e conversa.
+# SEM a chave  -> o assistente funciona por palavras-chave (app/assistente.py).
+#                 Continua respondendo, so que de forma mais limitada.
+ANTHROPIC_API_KEY = ler("ANTHROPIC_API_KEY", "")
+
+# Quanto a IA deve "pensar" antes de responder.
+#   low    -> rapido e barato. Suficiente para consultar a carteira.
+#   medium -> equilibrio
+#   high   -> respostas mais elaboradas, porem mais lentas e caras
+IA_ESFORCO = ler("IA_ESFORCO", "low")
+
 # --- Configuracoes que mudam entre o seu PC e o servidor ---
 #
 # AMBIENTE: "desenvolvimento" no seu computador, "producao" no servidor.

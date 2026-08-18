@@ -35,7 +35,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app import api, assistente, auth, config, planilha, seed
+from app import api, assistente, assistente_ia, auth, config, planilha, seed
 from app.database import PASTA_RAIZ, get_db
 from app.menu import MENU, buscar_modulo
 from app.models import (
@@ -43,6 +43,7 @@ from app.models import (
     PERFIS_VALIDOS,
     Agreement,
     AuthorizedEmail,
+    ChatMessage,
     Claim,
     Commission,
     Delinquency,
@@ -1502,19 +1503,45 @@ def exportar_acessos(
 # ===============================================================
 # MODULO: ASSISTENTE
 # ===============================================================
+# Quantas falas da conversa mostramos ao abrir a tela.
+LIMITE_CONVERSA = 40
+
+
+def _conversa_de(db: Session, email: str) -> list[ChatMessage]:
+    """As falas anteriores desta pessoa, da mais antiga para a mais nova."""
+    recentes = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.usuario_email == email)
+        .order_by(ChatMessage.id.desc())
+        .limit(LIMITE_CONVERSA)
+        .all()
+    )
+    return list(reversed(recentes))
+
+
 @app.get("/assistente", response_class=HTMLResponse)
 def tela_assistente(
     request: Request,
+    db: Session = Depends(get_db),
     usuario: User | None = Depends(exigir_login),
 ):
     fora = barrar(usuario, "assist")
     if fora:
         return fora
 
+    email = usuario.email_acesso or usuario.email
+
     return templates.TemplateResponse(
         request,
         "assistente.html",
-        contexto(usuario, "assist", sugestoes=assistente.SUGESTOES),
+        contexto(
+            usuario,
+            "assist",
+            sugestoes=assistente.SUGESTOES,
+            conversa=_conversa_de(db, email),
+            # a tela mostra um selo diferente conforme o motor em uso
+            usando_ia=assistente_ia.esta_disponivel(),
+        ),
     )
 
 
@@ -1525,12 +1552,74 @@ def perguntar_ao_assistente(
     usuario: User | None = Depends(exigir_login),
 ):
     """
-    Recebe a pergunta digitada e devolve a resposta em JSON.
+    Recebe a pergunta e devolve a resposta em JSON.
 
-    O JavaScript da tela chama esta rota e escreve a resposta na
-    conversa, sem recarregar a pagina.
+    A ordem de tentativa:
+      1. se houver chave da Anthropic, pergunta para a IA
+      2. se a IA falhar (sem internet, chave invalida, limite atingido),
+         cai para o assistente por palavras-chave
+      3. o assistente por palavras-chave sempre responde alguma coisa
+
+    Assim ninguem nunca fica sem resposta, nem quando a IA esta fora.
     """
     if usuario is None:
-        return {"resposta": "Sua sessão expirou. Entre novamente."}
+        return {"resposta": "Sua sessão expirou. Entre novamente.", "origem": "erro"}
 
-    return {"resposta": assistente.responder(db, pergunta)}
+    pergunta = (pergunta or "").strip()
+    if not pergunta:
+        return {"resposta": "Digite uma pergunta para eu poder ajudar. 🙂",
+                "origem": "regras"}
+
+    email = usuario.email_acesso or usuario.email
+    aviso = ""
+
+    # --- 1. tenta a IA ---
+    resposta = ""
+    origem = "regras"
+
+    if assistente_ia.esta_disponivel():
+        historico = [
+            {"role": m.papel, "content": m.conteudo}
+            for m in _conversa_de(db, email)
+        ]
+        resposta, erro = assistente_ia.responder(pergunta, historico)
+        if resposta:
+            origem = "ia"
+        else:
+            # A IA falhou. Registramos no terminal para voces verem o
+            # motivo, e seguimos para o plano B.
+            print(f">> IA indisponivel ({erro}). Usando o assistente por regras.")
+            aviso = (
+                '<br><br><span style="font-size:11.5px;opacity:.7">'
+                "⚠️ A IA está indisponível no momento; respondi pelo modo básico."
+                "</span>"
+            )
+
+    # --- 2. plano B: palavras-chave ---
+    if not resposta:
+        resposta = assistente.responder(db, pergunta) + aviso
+
+    # --- 3. guarda a conversa ---
+    db.add(ChatMessage(usuario_email=email, papel="user", conteudo=pergunta))
+    db.add(ChatMessage(usuario_email=email, papel="assistant",
+                       conteudo=resposta, origem=origem))
+    db.commit()
+
+    return {"resposta": resposta, "origem": origem}
+
+
+@app.post("/assistente/limpar")
+def limpar_conversa(
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """Apaga a conversa desta pessoa e começa do zero."""
+    fora = barrar(usuario, "assist")
+    if fora:
+        return fora
+
+    email = usuario.email_acesso or usuario.email
+    db.query(ChatMessage).filter(ChatMessage.usuario_email == email).delete()
+    db.commit()
+
+    return RedirectResponse("/assistente", status_code=303)

@@ -9,6 +9,7 @@ bcrypt==5.0.0             # transforma a senha em hash (nunca texto puro)
 itsdangerous==2.2.0       # assina o cookie de sessao do login
 python-multipart==0.0.32  # le os campos do formulario e o upload de arquivo
 openpyxl==3.1.5           # le a planilha .xlsx enviada pela tela
+anthropic==0.122.0        # o assistente com inteligencia artificial
 
 # --- so para rodar os testes ---
 httpx2==2.12.0            # simula um navegador em tests/test_login.py

@@ -260,7 +260,10 @@ verificar("com a chave certa, responde 200", r.status_code == 200)
 if r.status_code == 200:
     dados = r.json()
     verificar("  informa que esta no ar", dados.get("situacao") == "no ar")
-    verificar("  traz o total de apolices", dados["totais"]["apolices"] == 50)
+    from app.seed import TOTAL_APOLICES
+    verificar(f"  traz o total de apolices ({TOTAL_APOLICES})",
+              dados["totais"]["apolices"] == TOTAL_APOLICES,
+              f"veio: {dados['totais']['apolices']}")
 
 r = api.get("/api/v1/apolices?status=Ativa&limite=5", headers=CHAVE)
 verificar("lista apolices filtrando por status",

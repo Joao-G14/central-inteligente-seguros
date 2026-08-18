@@ -116,8 +116,13 @@ verificar(
 # ---------------------------------------------------------------
 print("\n4. Tabela policies (carteira de apolices)")
 
+# Lemos a quantidade do proprio seed.py, em vez de escrever 50 aqui.
+# Assim, se voces mudarem TOTAL_APOLICES, o teste acompanha sozinho.
+from app.seed import TOTAL_APOLICES  # noqa: E402
+
 apolices = db.query(Policy).all()
-verificar("tem exatamente 50 apolices", len(apolices) == 50, f"encontradas: {len(apolices)}")
+verificar(f"tem exatamente {TOTAL_APOLICES} apolices",
+          len(apolices) == TOTAL_APOLICES, f"encontradas: {len(apolices)}")
 
 numeros = [a.numero_apolice for a in apolices]
 verificar("nenhum numero de apolice repetido", len(numeros) == len(set(numeros)))
@@ -239,8 +244,8 @@ if arquivo_sql.exists():
     # O SQLite escreve os nomes de tabela entre aspas: INSERT INTO "policies"
     total_inserts = conteudo.count('INSERT INTO "policies"')
     verificar(
-        "  contem os dados das 50 apolices",
-        total_inserts == 50,
+        f"  contem os dados das {TOTAL_APOLICES} apolices",
+        total_inserts == TOTAL_APOLICES,
         f"encontrados: {total_inserts} INSERT",
     )
     verificar(
