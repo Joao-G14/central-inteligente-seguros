@@ -1,0 +1,292 @@
+{# ==================================================================
+   acessos.html — Controle de Acesso
+   ==================================================================
+   Tela exclusiva do ESTIPULANTE. Tem duas partes:
+
+     1. LISTA DE ACESSO AUTORIZADO — quem pode entrar
+     2. HISTORICO DE ACESSOS      — quem entrou, quando e de onde
+   ================================================================== #}
+{% extends "base.html" %}
+
+{% block titulo %}Controle de Acesso — Central de Seguros{% endblock %}
+{% block cabecalho %}Controle de Acesso{% endblock %}
+{% block subcabecalho %}Quem pode entrar no sistema e quem já entrou{% endblock %}
+
+{% block conteudo %}
+
+  {% if aviso %}
+    <div class="sucesso"><b>✅ {{ aviso }}</b></div>
+  {% endif %}
+  {% if erro %}
+    <div class="erro-lista"><b>⚠️ {{ erro }}</b></div>
+  {% endif %}
+
+  {# ---------- OS NUMEROS ---------- #}
+  <div class="kpis">
+    <div class="kpi">
+      <div class="lbl">Acessos registrados</div>
+      <div class="val">{{ kpis.total }}</div>
+      <div class="delta">{{ kpis.sucessos }} entraram · {{ kpis.falhas }} recusados</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">E-mails diferentes</div>
+      <div class="val">{{ kpis.emails_unicos }}</div>
+      <div class="delta">pessoas que já usaram o sistema</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Tentativas recusadas</div>
+      <div class="val">{{ kpis.falhas }}</div>
+      <div class="delta {{ 'down' if kpis.falhas else '' }}">senha ou e-mail incorretos</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Autorizações ativas</div>
+      <div class="val">{{ kpis.autorizacoes }}</div>
+      <div class="delta {{ 'up' if exigir else 'warn' }}">
+        {{ 'lista exigida' if exigir else '● lista desligada' }}
+      </div>
+    </div>
+  </div>
+
+  {# ==============================================================
+     PARTE 1 — LISTA DE ACESSO AUTORIZADO
+     ============================================================== #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Lista de acesso autorizado</h3>
+        <p>Quem pode entrar no sistema, além de saber a senha da categoria</p>
+      </div>
+    </div>
+
+    {# --- A chave que liga e desliga a exigência --- #}
+    <div class="interruptor {{ 'ligado' if exigir else '' }}">
+      <div class="texto">
+        {% if exigir %}
+          <b>🔒 A lista está sendo exigida.</b>
+          Só entra quem estiver cadastrado abaixo <b>e</b> souber a senha da categoria.
+        {% else %}
+          <b>🔓 A lista está desligada.</b>
+          Neste momento <b>qualquer e-mail</b> entra, bastando saber a senha da
+          categoria. Ligue a exigência para restringir o acesso.
+        {% endif %}
+      </div>
+      <form method="post" action="/acessos/exigencia">
+        <input type="hidden" name="ligar" value="{{ 'nao' if exigir else 'sim' }}">
+        <button type="submit" class="btn-enviar">
+          {{ 'Desligar exigência' if exigir else 'Ligar exigência' }}
+        </button>
+      </form>
+    </div>
+
+    {% if exigir and kpis.autorizacoes == 0 %}
+      <div class="erro-lista" style="margin-top:14px">
+        <b>⚠️ Atenção: a exigência está ligada e a lista está vazia.</b>
+        <ul><li>Ninguém consegue entrar no sistema neste momento.
+        Cadastre pelo menos um e-mail ou domínio abaixo.</li></ul>
+      </div>
+    {% endif %}
+
+    {# --- Formulário para cadastrar --- #}
+    <form method="post" action="/acessos/autorizar" class="form-linha">
+      <div class="campo-linha">
+        <label for="valor">E-mail ou domínio</label>
+        <input type="text" id="valor" name="valor" required
+               placeholder="joao@empresa.com.br  ou  @empresa.com.br">
+      </div>
+      <div class="campo-linha" style="max-width:190px">
+        <label for="perfil">Pode entrar como</label>
+        <select id="perfil" name="perfil">
+          <option value="TODAS">Todas as categorias</option>
+          <option value="ESTIPULANTE">Estipulante</option>
+          <option value="CORRETORA">Corretora</option>
+          <option value="SEGURADORA">Seguradora</option>
+        </select>
+      </div>
+      <div class="campo-linha">
+        <label for="observacao">Observação (opcional)</label>
+        <input type="text" id="observacao" name="observacao"
+               placeholder="Ex.: Analista do financeiro">
+      </div>
+      <button type="submit" class="btn-enviar">Autorizar</button>
+    </form>
+
+    <p class="dica">
+      💡 Comece o texto com <b>@</b> para liberar um domínio inteiro. Cadastrar
+      <code>@sebraeprev.com.br</code> libera todos os e-mails dessa empresa de
+      uma vez — não é preciso cadastrar pessoa por pessoa.
+    </p>
+
+    <div class="tabela-rolagem">
+      <table>
+        <thead>
+          <tr>
+            <th>E-mail / domínio</th>
+            <th>Tipo</th>
+            <th>Categoria</th>
+            <th>Observação</th>
+            <th>Cadastrado por</th>
+            <th>Situação</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in autorizados %}
+            <tr>
+              <td><b>{{ a.valor }}</b></td>
+              <td>
+                {% if a.e_dominio() %}
+                  <span class="pill blue">Domínio</span>
+                {% else %}
+                  <span class="pill cinza">E-mail</span>
+                {% endif %}
+              </td>
+              <td>{{ 'Todas' if a.perfil == 'TODAS' else a.perfil|capitalize }}</td>
+              <td>{{ a.observacao or '—' }}</td>
+              <td>
+                {{ a.cadastrado_por or '—' }}<br>
+                <span style="font-size:11px;color:var(--muted)">
+                  {{ a.criado_em.strftime('%d/%m/%Y') }}
+                </span>
+              </td>
+              <td>
+                {% if a.ativo %}
+                  <span class="pill ok">Ativo</span>
+                {% else %}
+                  <span class="pill late">Bloqueado</span>
+                {% endif %}
+              </td>
+              <td style="white-space:nowrap">
+                <form method="post" action="/acessos/alternar/{{ a.id }}" style="display:inline">
+                  <button type="submit" class="act-btn">
+                    {{ 'Bloquear' if a.ativo else 'Reativar' }}
+                  </button>
+                </form>
+                <form method="post" action="/acessos/remover/{{ a.id }}" style="display:inline"
+                      onsubmit="return confirm('Remover {{ a.valor }} da lista? Esta ação não pode ser desfeita.')">
+                  <button type="submit" class="act-btn perigo">Remover</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="7" class="vazio">
+                Nenhum e-mail autorizado ainda. Cadastre acima.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {# ==============================================================
+     PARTE 2 — HISTORICO DE ACESSOS
+     ============================================================== #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Histórico de acessos</h3>
+        <p>
+          Toda tentativa de entrada, com data, hora e origem
+          {% if total_filtrado != kpis.total %}
+            — mostrando {{ total_filtrado }} de {{ kpis.total }}
+          {% endif %}
+        </p>
+      </div>
+      <a class="exp-btn" href="/acessos/exportar" download>⬇ Exportar Excel</a>
+    </div>
+
+    {# --- Filtros --- #}
+    <form method="get" action="/acessos" class="form-linha">
+      <div class="campo-linha">
+        <label for="busca">Buscar e-mail</label>
+        <input type="search" id="busca" name="busca" value="{{ filtros.busca or '' }}"
+               placeholder="parte do e-mail…">
+      </div>
+      <div class="campo-linha" style="max-width:180px">
+        <label for="perfil_f">Categoria</label>
+        <select id="perfil_f" name="perfil">
+          <option value="">Todas</option>
+          {% for p in ['ESTIPULANTE', 'CORRETORA', 'SEGURADORA'] %}
+            <option value="{{ p }}" {% if filtros.perfil == p %}selected{% endif %}>
+              {{ p|capitalize }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="campo-linha" style="max-width:180px">
+        <label for="resultado">Resultado</label>
+        <select id="resultado" name="resultado">
+          <option value="">Todos</option>
+          <option value="sucesso" {% if filtros.resultado == 'sucesso' %}selected{% endif %}>Entraram</option>
+          <option value="falha" {% if filtros.resultado == 'falha' %}selected{% endif %}>Recusados</option>
+        </select>
+      </div>
+      <button type="submit" class="btn-enviar">Filtrar</button>
+      {% if filtros.busca or filtros.perfil or filtros.resultado %}
+        <a href="/acessos" class="exp-btn">Limpar</a>
+      {% endif %}
+    </form>
+
+    <div class="tabela-rolagem">
+      <table>
+        <thead>
+          <tr>
+            <th>Data e hora</th>
+            <th>E-mail informado</th>
+            <th>Categoria</th>
+            <th>Origem (IP)</th>
+            <th>Resultado</th>
+            <th>Motivo da recusa</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in acessos %}
+            <tr>
+              <td style="white-space:nowrap">{{ a.data_hora.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+              <td>{{ a.email_informado }}</td>
+              <td>{{ a.perfil_informado }}</td>
+              <td>{{ a.ip or '—' }}</td>
+              <td>
+                {% if a.sucesso %}
+                  <span class="pill ok">Entrou</span>
+                {% else %}
+                  <span class="pill late">Recusado</span>
+                {% endif %}
+              </td>
+              <td style="font-size:12px;color:var(--muted)">{{ a.motivo or '—' }}</td>
+              <td style="white-space:nowrap">
+                {# Atalho: bloquear direto da linha do histórico. #}
+                {% if a.email_informado not in emails_ja_listados %}
+                  <form method="post" action="/acessos/bloquear-email" style="display:inline">
+                    <input type="hidden" name="email" value="{{ a.email_informado }}">
+                    <button type="submit" class="act-btn perigo" title="Cadastra este e-mail como bloqueado">
+                      Bloquear
+                    </button>
+                  </form>
+                {% else %}
+                  <span style="font-size:11.5px;color:var(--muted)">já na lista</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="7" class="vazio">
+                Nenhum acesso encontrado com esses filtros.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if acessos|length >= limite %}
+      <p class="dica">
+        Mostrando os {{ limite }} acessos mais recentes. Use os filtros acima
+        para encontrar registros mais antigos, ou exporte para Excel.
+      </p>
+    {% endif %}
+  </div>
+
+{% endblock %}

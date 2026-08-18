@@ -21,7 +21,7 @@ O "--reload" faz o servidor reiniciar sozinho toda vez que voce salva
 um arquivo. Otimo para desenvolver, mas nao deve ser usado em producao.
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import csv
 import io
@@ -39,8 +39,10 @@ from app import api, assistente, auth, config, planilha, seed
 from app.database import PASTA_RAIZ, get_db
 from app.menu import MENU, buscar_modulo
 from app.models import (
+    CHAVE_EXIGIR_AUTORIZACAO,
     PERFIS_VALIDOS,
     Agreement,
+    AuthorizedEmail,
     Claim,
     Commission,
     Delinquency,
@@ -50,6 +52,7 @@ from app.models import (
     Pendency,
     Policy,
     Proposal,
+    Setting,
     User,
 )
 
@@ -1186,6 +1189,313 @@ def integracoes(
         "integracoes.html",
         contexto(usuario, "integracoes", conexoes=CONEXOES_PREVISTAS,
                  prerequisitos=PRE_REQUISITOS, endpoints=ENDPOINTS_DA_API),
+    )
+
+
+# ===============================================================
+# MODULO: CONTROLE DE ACESSO  (só o estipulante)
+# ===============================================================
+# Quantos acessos mostrar na tela de uma vez.
+LIMITE_HISTORICO = 200
+
+
+@app.get("/acessos", response_class=HTMLResponse)
+def acessos(
+    request: Request,
+    busca: str = "",
+    perfil: str = "",
+    resultado: str = "",
+    aviso: str = "",
+    erro: str = "",
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """Mostra quem pode entrar e quem já entrou."""
+    fora = barrar(usuario, "acessos")
+    if fora:
+        return fora
+
+    return _tela_acessos(request, db, usuario, busca, perfil, resultado, aviso, erro)
+
+
+def _tela_acessos(request, db, usuario, busca="", perfil="", resultado="",
+                  aviso="", erro=""):
+    """Monta a tela. Fica separado porque várias rotas voltam para ela."""
+    # --- histórico, com os filtros aplicados ---
+    consulta = db.query(LoginHistory)
+
+    if busca:
+        # ilike = busca sem diferenciar maiúscula de minúscula.
+        # O % antes e depois significa "contém em qualquer posição".
+        consulta = consulta.filter(LoginHistory.email_informado.ilike(f"%{busca}%"))
+    if perfil:
+        consulta = consulta.filter(LoginHistory.perfil_informado == perfil)
+    if resultado == "sucesso":
+        consulta = consulta.filter(LoginHistory.sucesso.is_(True))
+    elif resultado == "falha":
+        consulta = consulta.filter(LoginHistory.sucesso.is_(False))
+
+    total_filtrado = consulta.count()
+    registros = (
+        consulta.order_by(LoginHistory.data_hora.desc()).limit(LIMITE_HISTORICO).all()
+    )
+
+    # --- números do topo (sempre do total, não do filtro) ---
+    total = db.query(LoginHistory).count()
+    sucessos = db.query(LoginHistory).filter(LoginHistory.sucesso.is_(True)).count()
+    emails_unicos = db.query(
+        func.count(func.distinct(LoginHistory.email_informado))
+    ).scalar() or 0
+
+    autorizados = (
+        db.query(AuthorizedEmail)
+        .order_by(AuthorizedEmail.ativo.desc(), AuthorizedEmail.valor)
+        .all()
+    )
+
+    kpis = {
+        "total": total,
+        "sucessos": sucessos,
+        "falhas": total - sucessos,
+        "emails_unicos": emails_unicos,
+        "autorizacoes": sum(1 for a in autorizados if a.ativo),
+    }
+
+    return templates.TemplateResponse(
+        request,
+        "acessos.html",
+        contexto(
+            usuario,
+            "acessos",
+            acessos=registros,
+            total_filtrado=total_filtrado,
+            limite=LIMITE_HISTORICO,
+            autorizados=autorizados,
+            # para o botão "Bloquear" não aparecer em quem já está na lista
+            emails_ja_listados={a.valor for a in autorizados},
+            exigir=auth.exigir_autorizacao(db),
+            kpis=kpis,
+            filtros={"busca": busca, "perfil": perfil, "resultado": resultado},
+            aviso=aviso,
+            erro=erro,
+        ),
+    )
+
+
+def _voltar_para_acessos(aviso: str = "", erro: str = ""):
+    """Volta para a tela mostrando uma mensagem."""
+    from urllib.parse import urlencode
+
+    parametros = {k: v for k, v in {"aviso": aviso, "erro": erro}.items() if v}
+    destino = "/acessos"
+    if parametros:
+        destino += "?" + urlencode(parametros)
+    return RedirectResponse(destino, status_code=303)
+
+
+@app.post("/acessos/autorizar")
+def autorizar_email(
+    valor: str = Form(...),
+    perfil: str = Form("TODAS"),
+    observacao: str = Form(""),
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """Cadastra um e-mail ou domínio na lista de acesso."""
+    fora = barrar(usuario, "acessos")
+    if fora:
+        return fora
+
+    valor = (valor or "").strip().lower()
+
+    # Confere o formato: ou é um domínio (@algo.com) ou um e-mail inteiro.
+    if valor.startswith("@"):
+        if "." not in valor[1:] or len(valor) < 5:
+            return _voltar_para_acessos(
+                erro=f'"{valor}" não parece um domínio válido. Exemplo: @empresa.com.br'
+            )
+    elif not auth.formato_de_email_valido(valor):
+        return _voltar_para_acessos(
+            erro=f'"{valor}" não é um e-mail válido nem um domínio. '
+                 f"Para liberar uma empresa inteira, comece com @."
+        )
+
+    if perfil not in ["TODAS"] + PERFIS_VALIDOS:
+        perfil = "TODAS"
+
+    if db.query(AuthorizedEmail).filter(AuthorizedEmail.valor == valor).first():
+        return _voltar_para_acessos(erro=f"{valor} já está na lista.")
+
+    db.add(
+        AuthorizedEmail(
+            valor=valor,
+            perfil=perfil,
+            observacao=(observacao or "").strip() or None,
+            ativo=True,
+            cadastrado_por=usuario.email_acesso or usuario.nome,
+        )
+    )
+    db.commit()
+
+    return _voltar_para_acessos(aviso=f"{valor} foi autorizado.")
+
+
+@app.post("/acessos/bloquear-email")
+def bloquear_email(
+    email: str = Form(...),
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """
+    Atalho do histórico: cadastra o e-mail já como BLOQUEADO.
+
+    Serve para quando você vê no histórico um e-mail que não deveria
+    estar acessando e quer barrá-lo na hora.
+    """
+    fora = barrar(usuario, "acessos")
+    if fora:
+        return fora
+
+    email = (email or "").strip().lower()
+    if not email:
+        return _voltar_para_acessos(erro="E-mail vazio.")
+
+    existente = db.query(AuthorizedEmail).filter(AuthorizedEmail.valor == email).first()
+    if existente:
+        existente.ativo = False
+    else:
+        db.add(
+            AuthorizedEmail(
+                valor=email,
+                perfil="TODAS",
+                observacao="Bloqueado pelo histórico de acessos",
+                ativo=False,
+                cadastrado_por=usuario.email_acesso or usuario.nome,
+            )
+        )
+    db.commit()
+
+    return _voltar_para_acessos(
+        aviso=f"{email} foi bloqueado. Lembre-se: o bloqueio só faz efeito "
+              f"com a exigência da lista ligada."
+    )
+
+
+@app.post("/acessos/alternar/{registro_id}")
+def alternar_autorizacao(
+    registro_id: int,
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """Bloqueia quem está ativo, reativa quem está bloqueado."""
+    fora = barrar(usuario, "acessos")
+    if fora:
+        return fora
+
+    registro = db.query(AuthorizedEmail).filter(AuthorizedEmail.id == registro_id).first()
+    if registro is None:
+        return _voltar_para_acessos(erro="Registro não encontrado.")
+
+    registro.ativo = not registro.ativo
+    db.commit()
+
+    situacao = "reativado" if registro.ativo else "bloqueado"
+    return _voltar_para_acessos(aviso=f"{registro.valor} foi {situacao}.")
+
+
+@app.post("/acessos/remover/{registro_id}")
+def remover_autorizacao(
+    registro_id: int,
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """Apaga a autorização de vez."""
+    fora = barrar(usuario, "acessos")
+    if fora:
+        return fora
+
+    registro = db.query(AuthorizedEmail).filter(AuthorizedEmail.id == registro_id).first()
+    if registro is None:
+        return _voltar_para_acessos(erro="Registro não encontrado.")
+
+    valor = registro.valor
+    db.delete(registro)
+    db.commit()
+
+    return _voltar_para_acessos(aviso=f"{valor} foi removido da lista.")
+
+
+@app.post("/acessos/exigencia")
+def alternar_exigencia(
+    ligar: str = Form(...),
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """
+    Liga ou desliga a exigência da lista de acesso.
+
+    Com ela LIGADA, entrar exige duas coisas: estar na lista e saber a
+    senha da categoria. Com ela DESLIGADA, basta a senha.
+    """
+    fora = barrar(usuario, "acessos")
+    if fora:
+        return fora
+
+    novo_valor = "sim" if ligar == "sim" else "nao"
+
+    registro = (
+        db.query(Setting).filter(Setting.chave == CHAVE_EXIGIR_AUTORIZACAO).first()
+    )
+    if registro is None:
+        registro = Setting(chave=CHAVE_EXIGIR_AUTORIZACAO)
+        db.add(registro)
+
+    registro.valor = novo_valor
+    registro.atualizado_em = datetime.now()
+    db.commit()
+
+    if novo_valor == "sim":
+        ativas = db.query(AuthorizedEmail).filter(AuthorizedEmail.ativo.is_(True)).count()
+        if ativas == 0:
+            return _voltar_para_acessos(
+                erro="Exigência LIGADA, mas a lista está vazia — ninguém consegue "
+                     "entrar. Cadastre pelo menos um e-mail ou domínio agora."
+            )
+        return _voltar_para_acessos(
+            aviso=f"Exigência ligada. Agora só entram os {ativas} cadastros ativos."
+        )
+
+    return _voltar_para_acessos(
+        aviso="Exigência desligada. Qualquer e-mail entra com a senha da categoria."
+    )
+
+
+@app.get("/acessos/exportar")
+def exportar_acessos(
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """Baixa o histórico completo de acessos em .csv."""
+    fora = barrar(usuario, "acessos")
+    if fora:
+        return fora
+
+    registros = db.query(LoginHistory).order_by(LoginHistory.data_hora.desc()).all()
+    linhas = [
+        [
+            r.data_hora.strftime("%d/%m/%Y %H:%M:%S"),
+            r.email_informado,
+            r.perfil_informado,
+            r.ip or "",
+            "Entrou" if r.sucesso else "Recusado",
+            r.motivo or "",
+        ]
+        for r in registros
+    ]
+    return gerar_csv(
+        "historico_de_acessos.csv",
+        ["Data e hora", "E-mail informado", "Categoria", "IP", "Resultado", "Motivo"],
+        linhas,
     )
 
 

@@ -265,10 +265,17 @@ for pergunta, esperado in PERGUNTAS:
         f"respondeu: {resposta[:90]}",
     )
 
-# Pergunta que ele nao sabe responder.
+# Assunto que nao e da Central: recusa educada, dizendo o motivo.
 r = cliente.post("/assistente/perguntar", data={"pergunta": "qual a receita do bolo?"})
-verificar("pergunta desconhecida cai na resposta padrao",
-          "não entendi" in r.json()["resposta"].lower())
+resposta = r.json()["resposta"].lower()
+verificar("assunto fora do escopo recebe recusa educada",
+          "não posso responder" in resposta and "central" in resposta,
+          f"respondeu: {resposta[:80]}")
+
+# Pergunta que nao cai em nenhuma regra: resposta padrao explicando o escopo.
+r = cliente.post("/assistente/perguntar", data={"pergunta": "abacaxi roxo voando"})
+verificar("pergunta sem sentido cai na resposta padrao",
+          "não consegui entender" in r.json()["resposta"].lower())
 
 # O assistente responde com dados REAIS: conferimos um numero.
 db = SessionLocal()

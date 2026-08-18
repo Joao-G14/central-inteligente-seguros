@@ -16,11 +16,19 @@ embaralhamento de mao unica: da senha da para chegar no hash, mas do
 hash NAO da para voltar para a senha.
 """
 
+import re
+
 import bcrypt
 from itsdangerous import BadSignature, URLSafeSerializer
 
 from app import config
-from app.models import LoginHistory, User
+from app.models import (
+    CHAVE_EXIGIR_AUTORIZACAO,
+    AuthorizedEmail,
+    LoginHistory,
+    Setting,
+    User,
+)
 
 # ===============================================================
 # PARTE 1: SENHAS
@@ -109,20 +117,79 @@ def autenticar(db, email: str, senha: str, perfil: str) -> tuple[User | None, st
     """
     email = (email or "").strip().lower()
 
-    # 1. a categoria escolhida existe no banco?
+    # 1. o e-mail tem cara de e-mail?
+    if not formato_de_email_valido(email):
+        return None, "formato de e-mail invalido"
+
+    # 2. a categoria escolhida existe no banco?
     conta = db.query(User).filter(User.perfil == perfil).first()
     if conta is None:
         return None, "categoria inexistente"
 
-    # 2. a senha confere com a senha da categoria?
+    # 3. a senha confere com a senha da categoria?
     if not conferir_senha(senha, conta.senha_hash):
         return None, "senha incorreta para a categoria"
 
-    # 3. a categoria esta ativa?
+    # 4. a categoria esta ativa?
     if not conta.ativo:
         return None, "categoria inativa"
 
+    # 5. o e-mail esta na lista de acesso autorizado?
+    #    (so vale se a exigencia estiver ligada na tela de Controle de Acesso)
+    if exigir_autorizacao(db) and not email_autorizado(db, email, perfil):
+        return None, "e-mail fora da lista de acesso autorizado"
+
     return conta, ""
+
+
+# --- Conferencia do e-mail --------------------------------------
+
+# Regra simples de formato: alguma-coisa @ alguma-coisa . alguma-coisa
+# Nao tenta cobrir todos os casos exoticos da internet, so os erros comuns
+# (faltou o @, faltou o ponto, tem espaco no meio).
+FORMATO_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
+
+
+def formato_de_email_valido(email: str) -> bool:
+    """
+    Confere se o texto TEM CARA de e-mail.
+
+    ATENCAO — o que isto NAO faz:
+    nao prova que a caixa de e-mail existe nem que a pessoa e dona dela.
+    Isso so um e-mail de confirmacao provaria, e para enviar e-mail seria
+    preciso configurar um servidor de envio (SMTP), que o projeto ainda
+    nao tem. Por isso o controle de verdade e a lista de acesso
+    autorizado, logo abaixo.
+    """
+    return bool(FORMATO_EMAIL.match((email or "").strip()))
+
+
+def exigir_autorizacao(db) -> bool:
+    """
+    A exigencia da lista de acesso esta ligada?
+
+    Fica guardado no banco (tabela settings) e nao no arquivo .env,
+    para o estipulante conseguir ligar e desligar pela propria tela.
+    """
+    config_banco = (
+        db.query(Setting).filter(Setting.chave == CHAVE_EXIGIR_AUTORIZACAO).first()
+    )
+    return config_banco is not None and config_banco.valor == "sim"
+
+
+def email_autorizado(db, email: str, perfil: str) -> bool:
+    """
+    Percorre a lista de acesso e responde se este e-mail pode entrar
+    nesta categoria.
+
+    Basta UMA autorizacao servir (por e-mail exato ou por dominio).
+    """
+    for autorizacao in db.query(AuthorizedEmail).filter(
+        AuthorizedEmail.ativo.is_(True)
+    ):
+        if autorizacao.vale_para(email, perfil):
+            return True
+    return False
 
 
 def registrar_login(
@@ -239,9 +306,11 @@ def ler_email_do_cookie(request) -> str:
 #   CORRETORA   nao acessa sinistros
 #   SEGURADORA  nao acessa comissoes nem inadimplencia
 MODULOS_BLOQUEADOS = {
+    # O estipulante e quem administra o sistema, entao ve tudo,
+    # inclusive o Controle de Acesso.
     "ESTIPULANTE": [],
-    "CORRETORA": ["sinistros"],
-    "SEGURADORA": ["comissoes", "inadimplencia"],
+    "CORRETORA": ["sinistros", "acessos"],
+    "SEGURADORA": ["comissoes", "inadimplencia", "acessos"],
 }
 
 

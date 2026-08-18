@@ -99,6 +99,15 @@ MENU = [
         "icone": '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
         "pronto": True,
     },
+    {
+        # Tela de administracao: so o ESTIPULANTE enxerga.
+        # A regra esta em MODULOS_BLOQUEADOS, no app/auth.py.
+        "chave": "acessos",
+        "titulo": "Controle de Acesso",
+        "url": "/acessos",
+        "icone": '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+        "pronto": True,
+    },
 ]
 
 

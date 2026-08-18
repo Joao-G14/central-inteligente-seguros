@@ -1575,6 +1575,105 @@ code {
   font-family: Consolas, 'Courier New', monospace;
 }
 
+/* --- CONTROLE DE ACESSO --- */
+
+/* A chave que liga/desliga a exigencia da lista */
+.interruptor {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  border: 1px solid #F0DCA8;
+  background: #FFF8E8;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+}
+
+.interruptor.ligado {
+  border-color: #B9E3CA;
+  background: #E4F6EC;
+}
+
+.interruptor .texto {
+  flex: 1;
+  min-width: 260px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #8A6B14;
+}
+
+.interruptor.ligado .texto {
+  color: #14663A;
+}
+
+/* Formulario em linha, usado nos filtros e no cadastro */
+.form-linha {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.campo-linha {
+  flex: 1;
+  min-width: 170px;
+}
+
+.campo-linha label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  margin-bottom: 5px;
+}
+
+.campo-linha input,
+.campo-linha select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  background: #fff;
+}
+
+.campo-linha input:focus,
+.campo-linha select:focus {
+  border-color: var(--blue2);
+}
+
+/* Botao de acao destrutiva (remover, bloquear) */
+.act-btn.perigo {
+  color: var(--red);
+  border-color: #F3C9C9;
+}
+
+.act-btn.perigo:hover {
+  background: var(--red);
+  color: #fff;
+  border-color: var(--red);
+}
+
+/* Linha de dica embaixo de um painel */
+.dica {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 14px 0;
+  padding: 10px 14px;
+  background: #F7FAFE;
+  border-radius: 8px;
+}
+
 /* --- Rodape da tela de login --- */
 .login-rodape {
   font-size: 11.5px;

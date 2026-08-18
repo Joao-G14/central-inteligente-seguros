@@ -193,6 +193,104 @@ class Policy(Base):
 
 
 # ===============================================================
+# TABELA 3b: authorized_emails  (quem pode entrar no sistema)
+# ===============================================================
+class AuthorizedEmail(Base):
+    """
+    A lista de acesso autorizado.
+
+    POR QUE ISSO EXISTE
+    -------------------
+    A senha e compartilhada por categoria. Sozinha, ela deixa QUALQUER
+    pessoa que a descubra entrar com QUALQUER e-mail. Esta lista fecha
+    essa porta: alem de saber a senha, o e-mail precisa estar liberado.
+
+    DOIS JEITOS DE LIBERAR
+    ----------------------
+    1. E-mail exato:  joao.sales@sebraeprev.com.br
+       Libera so aquela pessoa.
+
+    2. Dominio inteiro: @sebraeprev.com.br
+       Libera qualquer e-mail que termine assim. Util para liberar uma
+       empresa inteira sem cadastrar pessoa por pessoa.
+
+    Guardamos sempre em minusculo, para "Joao@X.com" e "joao@x.com"
+    serem tratados como o mesmo.
+    """
+
+    __tablename__ = "authorized_emails"
+
+    id = Column(Integer, primary_key=True)
+
+    # O e-mail completo ou o dominio comecando com @
+    valor = Column(String(120), unique=True, nullable=False, index=True)
+
+    # Em qual categoria esta pessoa pode entrar.
+    # Se for "TODAS", vale para as tres.
+    perfil = Column(String(20), nullable=False, default="TODAS")
+
+    # Anotacao livre: "Analista do financeiro", "Contato da corretora"...
+    observacao = Column(String(120), nullable=True)
+
+    # Bloquear em vez de apagar preserva o historico de quem autorizou.
+    ativo = Column(Boolean, nullable=False, default=True)
+
+    # Quem cadastrou e quando.
+    cadastrado_por = Column(String(120), nullable=True)
+    criado_em = Column(DateTime, nullable=False, default=datetime.now)
+
+    def __repr__(self):
+        return f"<AuthorizedEmail {self.valor} ({self.perfil})>"
+
+    def e_dominio(self) -> bool:
+        """True se for um domínio (@empresa.com) e não um e-mail completo."""
+        return self.valor.startswith("@")
+
+    def vale_para(self, email: str, perfil: str) -> bool:
+        """Esta autorizacao libera este e-mail nesta categoria?"""
+        if not self.ativo:
+            return False
+
+        # A categoria precisa bater (ou a autorizacao vale para todas).
+        if self.perfil != "TODAS" and self.perfil != perfil:
+            return False
+
+        email = (email or "").strip().lower()
+
+        if self.e_dominio():
+            return email.endswith(self.valor)
+        return email == self.valor
+
+
+# ===============================================================
+# TABELA 3c: settings  (configuracoes que mudam pela tela)
+# ===============================================================
+class Setting(Base):
+    """
+    Guarda configuracoes que o estipulante liga e desliga pela tela,
+    sem precisar mexer em arquivo nenhum.
+
+    Cada linha e um par: uma chave e um valor, os dois em texto.
+    Hoje so usamos uma chave, "exigir_email_autorizado", mas o formato
+    aceita quantas precisarmos no futuro.
+    """
+
+    __tablename__ = "settings"
+
+    id = Column(Integer, primary_key=True)
+    chave = Column(String(60), unique=True, nullable=False, index=True)
+    valor = Column(String(200), nullable=False, default="")
+    atualizado_em = Column(DateTime, nullable=False, default=datetime.now)
+
+    def __repr__(self):
+        return f"<Setting {self.chave}={self.valor}>"
+
+
+# A chave que liga/desliga a exigencia da lista de acesso.
+CHAVE_EXIGIR_AUTORIZACAO = "exigir_email_autorizado"
+
+
+# ===============================================================
 # TABELA 4: payments  (movimentacao e pagamento por segurado)
 # ===============================================================
 class Payment(Base):

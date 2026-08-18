@@ -27,7 +27,9 @@ from app.models import (
     PERFIL_CORRETORA,
     PERFIL_ESTIPULANTE,
     PERFIL_SEGURADORA,
+    CHAVE_EXIGIR_AUTORIZACAO,
     Agreement,
+    AuthorizedEmail,
     Claim,
     Commission,
     Delinquency,
@@ -37,6 +39,7 @@ from app.models import (
     Pendency,
     Policy,
     Proposal,
+    Setting,
     User,
 )
 
@@ -145,6 +148,31 @@ def criar_usuarios(db) -> None:
     db.add_all(contas)
     db.commit()
     print(f"  {len(contas)} categorias de acesso criadas.")
+
+
+def criar_controle_de_acesso(db) -> None:
+    """
+    Prepara a tela de Controle de Acesso.
+
+    A exigencia da lista comeca DESLIGADA de proposito: se comecasse
+    ligada com a lista vazia, ninguem conseguiria entrar no sistema —
+    nem voces. O estipulante liga quando quiser, pela tela.
+
+    Deixamos o dominio do Sebrae Previdencia ja cadastrado, para que
+    ligar a exigencia nao trave o acesso de voces.
+    """
+    db.add(Setting(chave=CHAVE_EXIGIR_AUTORIZACAO, valor="nao"))
+    db.add(
+        AuthorizedEmail(
+            valor="@sebraeprev.com.br",
+            perfil="TODAS",
+            observacao="Domínio do Sebrae Previdência",
+            ativo=True,
+            cadastrado_por="instalação do sistema",
+        )
+    )
+    db.commit()
+    print("  Controle de acesso preparado (exigência começa desligada).")
 
 
 # ===============================================================
@@ -734,6 +762,8 @@ def executar() -> None:
         # Invoice depende de Agreement, e LoginHistory depende de User.
         for tabela in (
             LoginHistory,
+            AuthorizedEmail,
+            Setting,
             Invoice,
             Agreement,
             Payment,
@@ -751,6 +781,7 @@ def executar() -> None:
 
         # 3 e 4: usuarios e carteira de apolices
         criar_usuarios(db)
+        criar_controle_de_acesso(db)
         criar_apolices(db, hoje)
 
         # 5: os dados das outras telas (Fase 4)

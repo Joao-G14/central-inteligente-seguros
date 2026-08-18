@@ -17,6 +17,7 @@ A vantagem de consultar o banco e que a resposta nunca fica velha:
 se uma apolice mudar de status, a resposta muda junto.
 """
 
+import re
 import unicodedata
 from datetime import date
 
@@ -41,6 +42,26 @@ def _reais(valor: float, casas: int = 2) -> str:
     """Formata no padrao brasileiro: 1234.5 vira 'R$ 1.234,50'."""
     texto = f"{valor:,.{casas}f}"
     return "R$ " + texto.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _contem(texto: str, palavra: str) -> bool:
+    """
+    A palavra aparece no texto, COMECANDO uma palavra?
+
+    POR QUE NAO USAR SO "palavra in texto":
+    porque "api" esta dentro de "cAPItal". Buscando so por pedaco, a
+    pergunta "o que e capital segurado?" cairia na regra da API.
+
+    O \\b do comeco significa "borda de palavra": so encontra "api" se
+    ele comecar uma palavra. Nao colocamos \\b no fim de proposito,
+    para "inadimpl" continuar encontrando "inadimplencia".
+    """
+    return re.search(r"\b" + re.escape(palavra), texto) is not None
+
+
+def _alguma(texto: str, palavras: list[str]) -> bool:
+    """Alguma destas palavras aparece no texto?"""
+    return any(_contem(texto, p) for p in palavras)
 
 
 # ---------------------------------------------------------------
@@ -251,39 +272,423 @@ def _apolices_carteira(db) -> str:
     )
 
 
-# ---------------------------------------------------------------
-# A TABELA DE REGRAS
-# ---------------------------------------------------------------
-# A ordem importa: a primeira regra que combinar e a que responde.
-# Por isso as mais especificas vem antes das mais genericas.
-REGRAS = [
-    (["vence", "vencem", "renova", "renovacao", "renovacoes"], _renovacoes),
-    (["capital", "segurado total", "quanto vale"], _capital),
-    (["sinistro", "obito", "falecimento", "invalidez confirmada"], _sinistros),
-    (["inadimpl", "atraso", "atrasado", "devendo", "cobranca"], _inadimplencia),
-    (["comissao", "comissoes", "repasse", "premio arrecadado"], _comissoes),
-    (["pendencia", "pendencias", "falta", "faltando"], _pendencias),
-    (["pagamento", "movimentacao", "pagou", "a pagar", "planilha"], _pagamentos),
-    (["esteira", "proposta", "propostas", "subscricao", "aceitacao"], _esteira),
-    (["apolice", "apolices", "carteira"], _apolices_carteira),
+# ===============================================================
+# CONVERSA (cumprimentos, apresentacao, agradecimento)
+# ===============================================================
+# Estas funcoes recebem db so para terem todas a mesma forma, mesmo
+# quando nao precisam consultar o banco. O "_" no nome do parametro
+# e a forma de dizer "recebo, mas nao uso".
+
+
+def _cumprimento(_db) -> str:
+    return (
+        "Olá! 👋 Tudo bem por aqui, obrigado por perguntar.<br><br>"
+        "Sou o assistente da <b>Central Inteligente de Seguros</b>. "
+        "Posso consultar a carteira para você e explicar os termos do "
+        "seguro de risco.<br><br>"
+        "O que você precisa saber?"
+    )
+
+
+def _apresentacao(_db) -> str:
+    return (
+        "Sou o <b>assistente da Central Inteligente de Seguros</b>, o sistema "
+        "que o Sebrae Previdência usa para administrar o seguro de risco "
+        "(morte e invalidez) junto com a corretora e a seguradora.<br><br>"
+        "<b>O que eu faço:</b>"
+        "<table>"
+        "<tr><th>Consulto os dados</th><th>Explico os termos</th></tr>"
+        "<tr><td>apólices e renovações</td><td>o que é apólice, prêmio, capital</td></tr>"
+        "<tr><td>sinistros e pendências</td><td>o que é sinistro, DPS, carência</td></tr>"
+        "<tr><td>comissões e inadimplência</td><td>quem é estipulante, corretora, seguradora</td></tr>"
+        "<tr><td>pagamentos e propostas</td><td>como funciona a esteira</td></tr>"
+        "</table>"
+        "Tudo que eu respondo sobre números vem <b>do banco de dados, "
+        "consultado na hora</b> — nada é inventado."
+    )
+
+
+def _agradecimento(_db) -> str:
+    return "Por nada! 🙂 Se precisar de mais alguma coisa sobre a carteira, é só chamar."
+
+
+def _despedida(_db) -> str:
+    return "Até logo! 👋 Quando precisar, estarei por aqui."
+
+
+def _ajuda(_db) -> str:
+    return (
+        "Posso ajudar com estes assuntos:<br><br>"
+        "<b>📊 Números da carteira</b><br>"
+        "apólices, renovações, capital segurado, prêmio, vidas cobertas<br><br>"
+        "<b>💰 Financeiro</b><br>"
+        "pagamentos, boletos, comissões, inadimplência, convênios<br><br>"
+        "<b>📋 Operação</b><br>"
+        "sinistros, pendências, esteira de propostas<br><br>"
+        "<b>📖 Conceitos de seguro</b><br>"
+        "o que é apólice, prêmio, capital segurado, sinistro, DPS, carência, "
+        "beneficiário, estipulante, subscrição, invalidez…<br><br>"
+        "<b>⚙️ Sobre o sistema</b><br>"
+        "como enviar planilha, como funciona o acesso, o que cada perfil vê<br><br>"
+        "Experimente: <i>“o que é capital segurado?”</i> ou "
+        "<i>“quais apólices vencem este mês?”</i>"
+    )
+
+
+# ===============================================================
+# CONCEITOS DE SEGURO (o glossario)
+# ===============================================================
+# Cada item: (palavras que disparam, titulo, explicacao).
+# Escrito em linguagem simples, do jeito que se explicaria para alguem
+# que nunca trabalhou com seguros.
+GLOSSARIO = [
+    (
+        ["apolice", "o que e apolice"],
+        "Apólice",
+        "É o <b>contrato do seguro</b>. Nela está escrito quem está segurado, "
+        "quais riscos estão cobertos, de quanto é a indenização e até quando "
+        "vale. Na Central, cada apólice tem um número no formato <b>AP-0000</b>.",
+    ),
+    (
+        ["premio", "quanto custa o seguro", "mensalidade"],
+        "Prêmio",
+        "É <b>o valor que se paga pelo seguro</b> — a mensalidade. O nome confunde: "
+        "não é um prêmio que se ganha, é o que se paga. Quem recebe dinheiro em "
+        "caso de sinistro recebe a <b>indenização</b>, que é outra coisa.<br><br>"
+        "Na nossa carteira o prêmio fica em torno de <b>0,04% do capital "
+        "segurado por mês</b>: um capital de R$ 150.000 custa cerca de R$ 60,70.",
+    ),
+    (
+        ["capital segurado", "indenizacao", "o que e capital"],
+        "Capital segurado",
+        "É <b>quanto a seguradora paga</b> se o risco acontecer. Se alguém tem "
+        "capital de R$ 250.000 por morte, os beneficiários recebem esse valor.<br><br>"
+        "Quem tem cobertura de <b>Morte + Invalidez</b> tem o mesmo capital nas "
+        "duas coberturas — não é metade para cada.",
+    ),
+    (
+        ["sinistro", "o que e sinistro"],
+        "Sinistro",
+        "É <b>o acontecimento que aciona o seguro</b>: no nosso caso, o falecimento "
+        "ou a invalidez do participante. Quando ocorre, abre-se um processo "
+        "(protocolo <b>SIN-0000</b>), a documentação é analisada e, estando tudo "
+        "certo, a indenização é liberada.",
+    ),
+    (
+        ["dps", "declaracao de saude"],
+        "DPS — Declaração Pessoal de Saúde",
+        "É o <b>questionário de saúde</b> que a pessoa preenche ao contratar. "
+        "Serve para a seguradora avaliar o risco. Se a DPS não vier assinada, a "
+        "proposta fica <b>pendente</b> na esteira e não vira apólice.",
+    ),
+    (
+        ["carencia"],
+        "Carência",
+        "É o <b>tempo de espera</b> entre contratar e o seguro passar a valer para "
+        "determinada situação. Durante a carência, aquele risco específico ainda "
+        "não está coberto.",
+    ),
+    (
+        ["beneficiario", "quem recebe"],
+        "Beneficiário",
+        "É <b>quem recebe a indenização</b> quando o segurado falece. Pode ser "
+        "indicado pelo próprio participante; se não houver indicação, segue-se a "
+        "ordem prevista na lei.",
+    ),
+    (
+        ["estipulante", "quem e o estipulante"],
+        "Estipulante",
+        "É <b>quem contrata o seguro em nome de um grupo</b>. Aqui, o "
+        "<b>Sebrae Previdência</b>: ele representa os participantes junto à "
+        "seguradora, acompanha a operação e recebe <b>10% do prêmio</b> como "
+        "repasse. No sistema, é o perfil com acesso a tudo.",
+    ),
+    (
+        ["corretora", "o que faz a corretora"],
+        "Corretora",
+        "É <b>quem intermedeia</b> entre o estipulante e a seguradora: envia a "
+        "movimentação mensal, emite os boletos por convênio e cuida das propostas. "
+        "Recebe <b>15% do prêmio</b>. No sistema, não tem acesso a Sinistros.",
+    ),
+    (
+        ["seguradora", "icatu", "o que faz a seguradora"],
+        "Seguradora",
+        "É <b>quem assume o risco e paga a indenização</b> — aqui, a <b>ICATU</b>. "
+        "Fica com <b>75% do prêmio</b>, que cobre o risco e a operação. No sistema, "
+        "não tem acesso a Comissões nem a Inadimplência.",
+    ),
+    (
+        ["subscricao", "esteira", "aceitacao", "como funciona a esteira"],
+        "Esteira de subscrição",
+        "É o <b>caminho que uma proposta percorre até virar apólice</b>:<br><br>"
+        "<b>1. Proposta recebida</b> → chegou o pedido<br>"
+        "<b>2. Em análise</b> → a seguradora avalia o risco (subscrição)<br>"
+        "<b>3. Aceita</b> → aprovada, falta emitir a apólice<br>"
+        "<b>4. Pendente</b> → falta documento, ou foi recusada<br><br>"
+        "Uma proposta pode ser recusada por <b>risco agravado</b> — quando a "
+        "análise indica risco acima do que a seguradora aceita.",
+    ),
+    (
+        ["invalidez"],
+        "Invalidez",
+        "Cobertura que paga a indenização quando o participante fica "
+        "<b>permanentemente incapaz de trabalhar</b>. Exige laudo médico. É uma "
+        "das duas coberturas do ramo de risco, junto com Morte.",
+    ),
+    (
+        ["competencia", "o que e competencia"],
+        "Competência",
+        "É o <b>mês de referência</b> dos dados de pagamento, no formato "
+        "<b>MM/AAAA</b>. A movimentação de julho de 2026 tem competência "
+        "<b>07/2026</b>. Cada planilha enviada substitui a competência inteira.",
+    ),
+    (
+        ["convenio", "convenios", "fenacon", "opbb", "corecon", "fenasebrae"],
+        "Convênios",
+        "São as <b>entidades parceiras</b> cujos associados participam do seguro. "
+        "Os boletos são emitidos separados por convênio. Na Central hoje: "
+        "<b>FENACON</b>, <b>OPBB</b>, <b>CORECON</b> e <b>FenaSebrae</b>.",
+    ),
+    (
+        ["regua de cobranca", "regua"],
+        "Régua de cobrança",
+        "É a <b>escada de ações conforme o atraso aumenta</b>:<br><br>"
+        "<b>1 a 15 dias</b> → aviso amigável por e-mail<br>"
+        "<b>16 a 45 dias</b> → notificação de pendência<br>"
+        "<b>46 a 90 dias</b> → alerta de suspensão<br>"
+        "<b>mais de 90 dias</b> → risco de cancelamento",
+    ),
+    (
+        ["ramo", "ramos", "produtos", "modulo 101"],
+        "Ramos e módulos",
+        "<b>Ramo</b> é o tipo de seguro. A Central opera hoje o ramo de "
+        "<b>risco (morte e invalidez)</b>, identificado como <b>módulo 101</b> na "
+        "planilha. Auto, Viagem, Bike e Residencial estão no roadmap.<br><br>"
+        "O <b>código sub</b> (01, 02, 03) separa subgrupos dentro do módulo.",
+    ),
+    (
+        ["morte"],
+        "Cobertura de Morte",
+        "Paga a indenização aos <b>beneficiários</b> quando o participante falece. "
+        "É a cobertura mais comum da carteira. Pode ser contratada sozinha ou "
+        "junto com Invalidez.",
+    ),
 ]
 
-# As perguntas prontas que aparecem como botoes na tela.
+
+def _responder_glossario(titulo: str, explicacao: str):
+    """Monta a resposta de um conceito. Devolve uma funcao, para a
+    tabela de regras funcionar igual às outras."""
+
+    def resposta(_db):
+        return f"<b>{titulo}</b><br><br>{explicacao}"
+
+    return resposta
+
+
+# ===============================================================
+# SOBRE O PROPRIO SISTEMA
+# ===============================================================
+def _como_enviar_planilha(_db) -> str:
+    return (
+        "Para <b>enviar a planilha de movimentação</b>:<br><br>"
+        "1. abra o menu <b>Movimentação &amp; Pgto.</b><br>"
+        "2. no primeiro painel, escolha o arquivo <b>.xlsx</b><br>"
+        "3. clique em <b>Enviar e processar</b><br><br>"
+        "A planilha <b>substitui a competência inteira</b>: ao enviar a base de "
+        "08/2026, tudo que existia daquele mês é trocado. Por isso dá para "
+        "reenviar uma planilha corrigida sem duplicar nada.<br><br>"
+        "Se alguma linha tiver problema, eu aviso o <b>número da linha</b> e o "
+        "banco nem chega a ser alterado."
+    )
+
+
+def _sobre_acesso(_db) -> str:
+    return (
+        "O acesso ao sistema funciona assim:<br><br>"
+        "Cada <b>categoria</b> tem a sua senha — Estipulante, Corretora e "
+        "Seguradora. Você escolhe a categoria, informa <b>seu e-mail</b> e a "
+        "senha daquela categoria. O e-mail identifica quem entrou e fica "
+        "registrado com data, hora e IP.<br><br>"
+        "<b>O que cada categoria vê:</b>"
+        "<table>"
+        "<tr><th>Categoria</th><th>Não acessa</th></tr>"
+        "<tr><td>Estipulante</td><td>— (vê tudo)</td></tr>"
+        "<tr><td>Corretora</td><td>Sinistros</td></tr>"
+        "<tr><td>Seguradora</td><td>Comissões e Inadimplência</td></tr>"
+        "</table>"
+        "O estipulante pode ainda restringir quais e-mails têm permissão de "
+        "entrar, na tela <b>Controle de Acesso</b>."
+    )
+
+
+def _sobre_api(_db) -> str:
+    return (
+        "A <b>API da Central</b> permite que outros sistemas consultem e enviem "
+        "dados sem ninguém digitar.<br><br>"
+        "Já funcionam endereços para <b>apólices, movimentação, sinistros, "
+        "comissões, inadimplência e indicadores</b>, além do envio de "
+        "movimentação pela corretora.<br><br>"
+        "A documentação completa fica em <b>/docs</b>, e todo pedido precisa "
+        "enviar a chave de acesso no cabeçalho <code>X-API-Key</code>.<br><br>"
+        "A conexão <i>com</i> ICATU, corretora e Trust Prev depende de esses "
+        "sistemas liberarem credenciais e da homologação de segurança."
+    )
+
+
+def _sobre_central(_db) -> str:
+    return (
+        "A <b>Central Inteligente de Seguros</b> reúne em um só lugar a operação "
+        "do seguro de risco (morte e invalidez) do Sebrae Previdência.<br><br>"
+        "Antes, a informação ficava espalhada entre planilhas, e-mails e os "
+        "sistemas da corretora e da seguradora. A Central junta tudo: "
+        "<b>carteira de apólices, esteira de propostas, movimentação e "
+        "pagamentos, comissões, inadimplência, sinistros e pendências</b>.<br><br>"
+        "Ela conecta os <b>três lados</b> da operação:<br>"
+        "🏢 <b>Estipulante</b> (Sebrae Previdência) — representa os participantes<br>"
+        "🤝 <b>Corretora</b> — intermedeia e opera a movimentação<br>"
+        "🛡️ <b>Seguradora</b> (ICATU) — assume o risco e paga as indenizações"
+    )
+
+
+# ===============================================================
+# A TABELA DE REGRAS
+# ===============================================================
+# A ordem importa: a PRIMEIRA regra que combinar e a que responde.
+# Por isso a conversa vem antes dos dados, e os conceitos vem depois —
+# assim "o que e apolice?" cai no glossario, e "quantas apolices temos?"
+# cai na consulta ao banco.
+
+REGRAS_CONVERSA = [
+    (["ola", "oi ", "oi!", "oi?", "bom dia", "boa tarde", "boa noite",
+      "tudo bem", "tudo bom", "como vai", "e ai", "hey", "hello"], _cumprimento),
+    (["quem e voce", "quem es voce", "o que voce e", "voce e um robo",
+      "voce e uma ia", "se apresente", "qual seu nome", "quem voce e"], _apresentacao),
+    (["obrigad", "valeu", "agradec", "muito bom", "otimo trabalho"], _agradecimento),
+    (["tchau", "ate logo", "ate mais", "adeus", "falou"], _despedida),
+    (["ajuda", "o que voce sabe", "o que voce faz", "o que posso perguntar",
+      "me ajuda", "socorro", "opcoes"], _ajuda),
+]
+
+REGRAS_SISTEMA = [
+    (["enviar planilha", "mandar planilha", "subir planilha", "upload",
+      "importar planilha", "como envio"], _como_enviar_planilha),
+    (["acesso", "login", "entrar no sistema", "senha", "permissao",
+      "quem pode ver", "perfil"], _sobre_acesso),
+    (["api", "integracao", "integrar", "conectar sistema"], _sobre_api),
+    (["central", "o que e a central", "sobre o sistema", "para que serve",
+      "objetivo", "como funciona o sistema"], _sobre_central),
+]
+
+REGRAS_DADOS = [
+    (["vence", "vencem", "renova", "renovacao", "renovacoes"], _renovacoes),
+    (["capital total", "capital segurado total", "quanto vale a carteira",
+      "soma do capital"], _capital),
+    (["sinistro", "obito", "falecimento"], _sinistros),
+    (["inadimpl", "atraso", "atrasado", "devendo", "cobranca", "devedor"], _inadimplencia),
+    (["comissao", "comissoes", "repasse", "premio arrecadado"], _comissoes),
+    (["pendencia", "pendencias", "faltando", "em aberto"], _pendencias),
+    (["pagamento", "movimentacao", "pagou", "a pagar", "segurados"], _pagamentos),
+    (["esteira", "proposta", "propostas", "subscricao"], _esteira),
+    (["quantas apolices", "apolices", "carteira", "capital"], _apolices_carteira),
+]
+
+# O glossario e montado a partir da lista GLOSSARIO, para nao repetirmos
+# codigo. Cada conceito vira uma regra igual as outras.
+REGRAS_CONCEITOS = [
+    (palavras, _responder_glossario(titulo, explicacao))
+    for palavras, titulo, explicacao in GLOSSARIO
+]
+
+# ---------------------------------------------------------------
+# CONCEITO OU CONSULTA?
+# ---------------------------------------------------------------
+# A palavra "apolice" aparece em duas perguntas bem diferentes:
+#
+#   "o que e uma apolice?"        -> quer a EXPLICACAO (glossario)
+#   "quais apolices vencem?"      -> quer os DADOS (banco)
+#
+# Para escolher certo, olhamos se a pergunta pede uma definicao.
+# Se pedir, o glossario responde primeiro. Se nao, o banco responde
+# primeiro. E a mesma coisa que uma pessoa faria ao ouvir a pergunta.
+PALAVRAS_DE_DEFINICAO = [
+    "o que e", "o que sao", "que e um", "que e uma", "que significa",
+    "significa", "explica", "explique", "explicar", "defina", "definicao",
+    "conceito", "me fala sobre", "me diga o que", "quem e o", "quem e a",
+    "o que faz", "para que serve", "como funciona a esteira",
+]
+
+
+def _quer_uma_definicao(texto: str) -> bool:
+    """A pergunta está pedindo uma explicação, e não números?"""
+    return _alguma(texto, PALAVRAS_DE_DEFINICAO)
+
+
+# ===============================================================
+# ASSUNTOS QUE NAO SAO DA CENTRAL
+# ===============================================================
+# Quando a pergunta cai claramente fora do assunto, respondemos algo
+# especifico em vez do texto generico de "nao entendi". Fica mais
+# educado e deixa claro qual e o limite do assistente.
+FORA_DO_ASSUNTO = [
+    (["que horas", "que dia e hoje", "hora certa", "data de hoje"],
+     "o horário ou a data"),
+    # Cuidado: NAO colocar so "tempo" aqui. Existe "tempo médio de
+    # análise" na nossa operação, e a pergunta seria recusada por engano.
+    (["chuva", "chove", "chover", "chovendo", "clima", "temperatura",
+      "previsao do tempo", "tempo hoje", "tempo amanha", "faz sol"],
+     "previsão do tempo"),
+    (["receita", "comida", "bolo", "cozinhar", "almoco", "jantar"],
+     "receitas e culinária"),
+    (["futebol", "jogo", "campeonato", "time", "placar", "copa"],
+     "esportes"),
+    (["piada", "conta uma piada", "me faz rir", "engracad"],
+     "piadas"),
+    (["politica", "eleicao", "presidente", "governo", "votar"],
+     "política"),
+    (["musica", "filme", "serie", "netflix", "cantor", "banda"],
+     "entretenimento"),
+    (["dolar", "bitcoin", "bolsa de valores", "acoes da", "investimento em",
+      "cripto"], "investimentos e mercado financeiro"),
+    (["quanto e", "calcul", "raiz quadrada", "multiplic", "dividir por"],
+     "contas de matemática"),
+    (["traduz", "traducao", "em ingles", "em espanhol"],
+     "traduções"),
+    (["remedio", "sintoma", "tratamento", "dor de", "dor no", "dor na",
+      "estou doente", "o que tomo", "o que tomar", "receita medica"],
+     "orientação médica"),
+    (["advogado", "processo judicial", "acao na justica", "juridico"],
+     "orientação jurídica"),
+]
+
+
+def _recusar(assunto: str) -> str:
+    """Resposta educada para o que esta fora do escopo."""
+    return (
+        f"Desculpe, não posso responder sobre <b>{assunto}</b>. 🙏<br><br>"
+        "Sou o assistente da <b>Central Inteligente de Seguros</b> e só trato de "
+        "assuntos ligados à operação do seguro: apólices, renovações, sinistros, "
+        "comissões, inadimplência, pagamentos, propostas e os conceitos do ramo."
+        "<br><br>Digite <b>ajuda</b> para ver tudo que eu sei responder."
+    )
+
+
 SUGESTOES = [
+    "Olá, tudo bem?",
+    "O que você faz?",
     "Quais apólices vencem este mês?",
-    "Qual o capital segurado total?",
-    "Como estão os sinistros?",
+    "O que é capital segurado?",
     "Quem está inadimplente?",
-    "Como ficaram as comissões?",
-    "Quais pendências estão abertas?",
+    "Como envio a planilha?",
 ]
 
 RESPOSTA_PADRAO = (
-    "Não entendi a pergunta. 🤔<br><br>"
-    "Sei responder sobre: <b>apólices e carteira</b>, <b>renovações</b>, "
-    "<b>capital segurado</b>, <b>sinistros</b>, <b>inadimplência</b>, "
-    "<b>comissões</b>, <b>pendências</b>, <b>pagamentos</b> e <b>esteira de propostas</b>."
-    "<br><br>Tente, por exemplo: <i>“quais apólices vencem este mês?”</i>"
+    "Não consegui entender a pergunta. 🤔<br><br>"
+    "Sou o assistente da <b>Central Inteligente de Seguros</b>. Posso consultar "
+    "<b>apólices, renovações, sinistros, inadimplência, comissões, pendências, "
+    "pagamentos e propostas</b>, e também explicar os <b>termos do seguro</b> "
+    "(apólice, prêmio, capital segurado, DPS, carência…).<br><br>"
+    "Tente reformular, ou digite <b>ajuda</b> para ver a lista completa."
 )
 
 
@@ -292,14 +697,57 @@ def responder(db, pergunta: str) -> str:
     Recebe a pergunta e devolve a resposta em HTML.
 
     Esta e a unica funcao que o main.py precisa chamar.
+
+    A ordem da conferencia:
+      1. a pergunta esta vazia?
+      2. e um assunto que claramente nao e nosso? -> recusa educada
+      3. combina com alguma regra? -> responde
+      4. nenhuma das anteriores -> diz o que sabe fazer
     """
     if not pergunta or not pergunta.strip():
         return "Digite uma pergunta para eu poder ajudar. 🙂"
 
-    texto = _sem_acento(pergunta)
+    # Espacos nas pontas ajudam a encontrar palavras no comeco e no fim.
+    texto = " " + _sem_acento(pergunta).strip() + " "
 
-    for palavras_chave, funcao in REGRAS:
-        if any(palavra in texto for palavra in palavras_chave):
+    # 2. Fora do assunto — conferido ANTES das regras.
+    for palavras, assunto in FORA_DO_ASSUNTO:
+        if _alguma(texto, palavras):
+            # Excecao: se a pergunta TAMBEM fala de algo nosso, ela e
+            # nossa. "quanto e a comissao?" tem "quanto e", mas e sobre
+            # comissao — entao deixamos as regras normais responderem.
+            if not _fala_de_seguros(texto):
+                return _recusar(assunto)
+
+    # 3. As regras, na ordem certa.
+    #    Conversa e sistema vem sempre primeiro. Depois, o glossario e o
+    #    banco trocam de lugar conforme o tipo da pergunta.
+    if _quer_uma_definicao(texto):
+        ordem = REGRAS_CONVERSA + REGRAS_SISTEMA + REGRAS_CONCEITOS + REGRAS_DADOS
+    else:
+        ordem = REGRAS_CONVERSA + REGRAS_SISTEMA + REGRAS_DADOS + REGRAS_CONCEITOS
+
+    for palavras_chave, funcao in ordem:
+        if _alguma(texto, palavras_chave):
             return funcao(db)
 
+    # 4. Nao reconheceu
     return RESPOSTA_PADRAO
+
+
+# Palavras que provam que a pergunta e do nosso mundo, mesmo que ela
+# contenha alguma expressao da lista de fora-do-assunto.
+PALAVRAS_DO_NEGOCIO = [
+    "apolice", "apolices", "seguro", "segurado", "premio", "capital",
+    "sinistro", "cobertura", "carteira", "comissao", "comissoes",
+    "inadimpl", "boleto", "convenio", "participante", "beneficiario",
+    "corretora", "seguradora", "estipulante", "proposta", "esteira",
+    "movimentacao", "competencia", "renovacao", "pendencia", "invalidez",
+    "dps", "carencia", "vidas", "central", "planilha", "morte",
+    "analise", "subscricao", "matricula", "indenizacao", "vigencia",
+]
+
+
+def _fala_de_seguros(texto: str) -> bool:
+    """A pergunta menciona algo do nosso negócio?"""
+    return _alguma(texto, PALAVRAS_DO_NEGOCIO)
