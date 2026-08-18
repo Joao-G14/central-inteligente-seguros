@@ -114,31 +114,37 @@ def gerar_cpf_ficticio() -> str:
 # ETAPA 3: OS 3 USUARIOS FICTICIOS
 # ===============================================================
 def criar_usuarios(db) -> None:
-    """Cria um usuario para cada perfil de acesso."""
-    usuarios = [
+    """
+    Cria UMA conta para cada categoria de acesso.
+
+    Nao sao pessoas: sao as tres categorias do sistema. Cada uma guarda a
+    senha compartilhada daquela categoria. Quem entra digita o proprio
+    e-mail, que fica registrado no login_history.
+    """
+    contas = [
         User(
-            nome="Luciana Ferraz",
+            nome="Estipulante",
             email="estipulante@sebraeprev.com.br",
             senha_hash=gerar_hash(config.SENHA_ESTIPULANTE),
             perfil=PERFIL_ESTIPULANTE,
         ),
         User(
-            nome="Corretora Parceira",
+            nome="Corretora",
             email="corretora@sebraeprev.com.br",
             senha_hash=gerar_hash(config.SENHA_CORRETORA),
             perfil=PERFIL_CORRETORA,
         ),
         User(
-            nome="Seguradora ICATU",
+            nome="Seguradora",
             email="seguradora@sebraeprev.com.br",
             senha_hash=gerar_hash(config.SENHA_SEGURADORA),
             perfil=PERFIL_SEGURADORA,
         ),
     ]
 
-    db.add_all(usuarios)
+    db.add_all(contas)
     db.commit()
-    print(f"  {len(usuarios)} usuarios criados.")
+    print(f"  {len(contas)} categorias de acesso criadas.")
 
 
 # ===============================================================
@@ -762,11 +768,40 @@ def executar() -> None:
     exportar_para_sql()
 
     print("\n=== PRONTO ===")
-    print("\nUsuarios para teste:")
-    print("  estipulante@sebraeprev.com.br  /  estipulante@sebraeprev")
-    print("  corretora@sebraeprev.com.br    /  corretora@sebraeprev")
-    print("  seguradora@sebraeprev.com.br   /  seguradora@sebraeprev")
-    print()
+    print("\nPara entrar: escolha a categoria e digite a senha dela.")
+    print("O e-mail e livre — serve para registrar quem acessou.")
+    print("As senhas estao no seu arquivo .env.\n")
+
+
+def garantir_banco() -> bool:
+    """
+    Prepara o banco AUTOMATICAMENTE quando o sistema liga.
+
+    Por que isso existe: num servidor ninguem vai abrir um terminal para
+    rodar "python -m app.seed". Sem esta funcao, o site subiria com o
+    banco vazio e quebraria na primeira tela.
+
+    A regra e conservadora:
+      - as tabelas que faltarem sao criadas
+      - os dados iniciais SO entram se o banco estiver vazio
+
+    Assim, se ja houver dados (por exemplo, uma planilha que voces
+    enviaram), nada e apagado. Para reiniciar do zero de proposito,
+    rode "python -m app.seed", que limpa e recarrega.
+
+    Devolve True se carregou os dados iniciais, False se ja havia dados.
+    """
+    criar_tabelas()
+
+    db = SessionLocal()
+    try:
+        if db.query(User).count() > 0:
+            return False  # ja tem dados, nao mexe
+    finally:
+        db.close()
+
+    executar()
+    return True
 
 
 # Esta linha significa: "so execute se o arquivo for chamado direto,

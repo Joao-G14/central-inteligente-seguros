@@ -16,13 +16,46 @@
   <div class="engine-note">
     <div class="en-ic">🔗</div>
     <div>
-      <b>Para onde o projeto evolui.</b>
+      <b>A API da Central está no ar.</b>
       <p>
-        Hoje a base chega por envio de planilha e é carregada no banco pelo
-        comando <code>python -m app.seed</code>. A integração via API é a evolução
-        natural: os dados passariam a chegar automaticamente dos sistemas,
-        sem digitação nem planilhas.
+        A Central já publica seus dados e recebe movimentação por API. O que
+        falta é o outro lado: cada sistema parceiro precisa liberar acesso,
+        fornecer credenciais e passar pela homologação de segurança.
       </p>
+    </div>
+  </div>
+
+  {# ---------- A API QUE JA FUNCIONA ---------- #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>API da Central — disponível</h3>
+        <p>Endereços que sistemas parceiros já podem consumir hoje</p>
+      </div>
+      <a class="exp-btn" href="/docs" target="_blank">Abrir documentação ↗</a>
+    </div>
+
+    <p style="font-size:12.5px;color:var(--muted);margin-bottom:14px">
+      Todo pedido precisa enviar o cabeçalho
+      <code>X-API-Key</code> com a chave de acesso. Sem ela, a resposta é
+      <b>401 não autorizado</b>.
+    </p>
+
+    <div class="tabela-rolagem">
+      <table>
+        <thead>
+          <tr><th>Método</th><th>Endereço</th><th>O que faz</th></tr>
+        </thead>
+        <tbody>
+          {% for metodo, caminho, descricao in endpoints %}
+            <tr>
+              <td><span class="pill {{ 'ok' if metodo == 'GET' else 'blue' }}">{{ metodo }}</span></td>
+              <td><code>{{ caminho }}</code></td>
+              <td>{{ descricao }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 

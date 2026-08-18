@@ -79,43 +79,50 @@ def conferir_senha(senha_digitada: str, hash_do_banco: str) -> bool:
 # ===============================================================
 def autenticar(db, email: str, senha: str, perfil: str) -> tuple[User | None, str]:
     """
-    Faz as 3 conferencias do login, nesta ordem:
+    COMO O LOGIN FUNCIONA NESTE SISTEMA
+    -----------------------------------
+    Cada CATEGORIA tem a sua propria senha, compartilhada por todas as
+    pessoas daquela categoria:
 
-      1. o e-mail existe?
-      2. a senha confere?
-      3. o perfil escolhido na tela e o mesmo do cadastro?
+        ESTIPULANTE  -> senha do estipulante
+        CORRETORA    -> senha da corretora
+        SEGURADORA   -> senha da seguradora
+
+    O e-mail NAO precisa estar cadastrado. Ele serve para identificar
+    QUEM entrou, e fica gravado no login_history.
+
+    Ou seja, a conferencia e:
+      1. a categoria escolhida existe?
+      2. a senha confere com a senha daquela categoria?
+
+    ATENCAO — limitacao conhecida desta escolha:
+    como a senha e compartilhada, quem souber a senha da corretora entra
+    como corretora. Para tirar o acesso de uma pessoa e preciso trocar a
+    senha de todas daquela categoria. E o e-mail digitado nao e conferido,
+    entao o registro de quem acessou depende da boa-fe de quem digita.
+    Se um dia isso for um problema, a saida e voltar ao login por usuario
+    individual — o campo email da tabela users continua preparado para isso.
 
     Devolve DOIS valores:
-      - o usuario (ou None, se algo falhou)
-      - o motivo da falha (ou "" se deu tudo certo)
-
-    O motivo e guardado no login_history e serve para auditoria.
-
-    IMPORTANTE: a mensagem mostrada na TELA e sempre generica
-    ("E-mail, senha ou perfil incorretos"). Se a tela dissesse
-    "senha incorreta", estariamos confirmando para um invasor que
-    aquele e-mail existe no sistema.
+      - a conta da categoria (ou None, se falhou)
+      - o motivo da falha (ou "" se deu certo), gravado para auditoria
     """
     email = (email or "").strip().lower()
 
-    # 1. o e-mail existe?
-    usuario = db.query(User).filter(User.email == email).first()
-    if usuario is None:
-        return None, "e-mail nao encontrado"
+    # 1. a categoria escolhida existe no banco?
+    conta = db.query(User).filter(User.perfil == perfil).first()
+    if conta is None:
+        return None, "categoria inexistente"
 
-    # 2. a senha confere?
-    if not conferir_senha(senha, usuario.senha_hash):
-        return None, "senha incorreta"
+    # 2. a senha confere com a senha da categoria?
+    if not conferir_senha(senha, conta.senha_hash):
+        return None, "senha incorreta para a categoria"
 
-    # 3. o perfil escolhido bate com o do cadastro?
-    if usuario.perfil != perfil:
-        return None, f"perfil nao corresponde (cadastrado: {usuario.perfil})"
+    # 3. a categoria esta ativa?
+    if not conta.ativo:
+        return None, "categoria inativa"
 
-    # 4. a conta esta ativa?
-    if not usuario.ativo:
-        return None, "usuario inativo"
-
-    return usuario, ""
+    return conta, ""
 
 
 def registrar_login(
@@ -163,14 +170,21 @@ NOME_DO_COOKIE = "sessao_central"
 _assinador = URLSafeSerializer(config.SECRET_KEY, salt="sessao-central-seguros")
 
 
-def criar_cookie_sessao(resposta, usuario: User) -> None:
-    """Coloca o cracha assinado na resposta que vai para o navegador."""
-    valor = _assinador.dumps({"user_id": usuario.id})
+def criar_cookie_sessao(resposta, usuario: User, email: str = "") -> None:
+    """
+    Coloca o cracha assinado na resposta que vai para o navegador.
+
+    Guardamos duas coisas: a categoria (user_id) e o e-mail que a pessoa
+    digitou. O e-mail aparece no canto da tela, para quem estiver usando
+    saber com qual identificacao entrou.
+    """
+    valor = _assinador.dumps({"user_id": usuario.id, "email": email})
     resposta.set_cookie(
         key=NOME_DO_COOKIE,
         value=valor,
         httponly=True,   # o JavaScript da pagina nao consegue ler o cookie
         samesite="lax",  # o cookie nao e enviado a partir de outros sites
+        secure=config.COOKIE_SEGURO,  # em HTTPS, so trafega criptografado
         max_age=60 * 60 * 8,  # vale por 8 horas
     )
 
@@ -180,27 +194,39 @@ def apagar_cookie_sessao(resposta) -> None:
     resposta.delete_cookie(NOME_DO_COOKIE)
 
 
-def ler_usuario_do_cookie(db, request) -> User | None:
-    """
-    Le o cracha e devolve o usuario correspondente.
-
-    Devolve None se: nao ha cookie, a assinatura nao confere,
-    o usuario foi apagado do banco ou esta inativo.
-    """
+def _abrir_cookie(request) -> dict | None:
+    """Le e confere a assinatura do cracha. Devolve o conteudo ou None."""
     valor = request.cookies.get(NOME_DO_COOKIE)
     if not valor:
         return None
-
     try:
-        dados = _assinador.loads(valor)
+        return _assinador.loads(valor)
     except BadSignature:
         return None  # cookie adulterado ou assinado com outra chave
+
+
+def ler_usuario_do_cookie(db, request) -> User | None:
+    """
+    Le o cracha e devolve a categoria de acesso correspondente.
+
+    Devolve None se: nao ha cookie, a assinatura nao confere,
+    a categoria sumiu do banco ou esta inativa.
+    """
+    dados = _abrir_cookie(request)
+    if dados is None:
+        return None
 
     usuario = db.query(User).filter(User.id == dados.get("user_id")).first()
     if usuario is None or not usuario.ativo:
         return None
 
     return usuario
+
+
+def ler_email_do_cookie(request) -> str:
+    """Devolve o e-mail que a pessoa digitou ao entrar (ou vazio)."""
+    dados = _abrir_cookie(request)
+    return (dados or {}).get("email", "")
 
 
 # ===============================================================

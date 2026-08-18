@@ -24,7 +24,7 @@
       </div>
     </div>
 
-    <p class="login-titulo">Escolha seu tipo de acesso e entre com seus dados.</p>
+    <p class="login-titulo">Selecione seu tipo de acesso e informe seus dados.</p>
 
     {# Se o login falhou, o main.py manda a variavel "erro" e ela aparece aqui. #}
     {% if erro %}
@@ -55,17 +55,19 @@
 
     {# ---------- E-MAIL E SENHA ---------- #}
     <div class="campo">
-      <label for="email">E-mail</label>
-      {# required = o navegador nao deixa enviar vazio
+      <label for="email">Seu e-mail</label>
+      {# O e-mail identifica QUEM esta acessando e fica registrado no
+         historico. A senha e a do tipo de acesso selecionado acima.
+         required = o navegador nao deixa enviar vazio
          autofocus = o cursor ja comeca neste campo #}
       <input type="email" id="email" name="email"
              value="{{ email_digitado or '' }}"
-             placeholder="seu.email@sebraeprev.com.br"
+             placeholder="nome@empresa.com.br"
              required autofocus>
     </div>
 
     <div class="campo">
-      <label for="senha">Senha</label>
+      <label for="senha">Senha de acesso</label>
       {# type="password" faz o navegador esconder o que e digitado #}
       <input type="password" id="senha" name="senha"
              placeholder="••••••••" required>
@@ -73,16 +75,9 @@
 
     <button type="submit" class="btn-entrar">Entrar</button>
 
-    {# ---------- LEMBRETE DOS USUARIOS DE TESTE ----------
-       Isto existe so enquanto o sistema esta em desenvolvimento.
-       Antes de colocar no ar de verdade, este bloco deve ser apagado. #}
-    <div class="aviso-demo">
-      <b>Ambiente de desenvolvimento — dados fictícios</b>
-      Estipulante: <code>estipulante@sebraeprev.com.br</code><br>
-      Corretora: <code>corretora@sebraeprev.com.br</code><br>
-      Seguradora: <code>seguradora@sebraeprev.com.br</code><br>
-      A senha de cada um é o e-mail sem <code>.com.br</code>
-    </div>
+    <p class="login-rodape">
+      Acesso restrito. Seu e-mail e o horário de entrada ficam registrados.
+    </p>
 
   </form>
 

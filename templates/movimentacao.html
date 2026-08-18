@@ -19,17 +19,82 @@
     <div class="ph">
       <div>
         <h3>Envio da planilha de movimentação</h3>
-        <p>Base enviada mensalmente pela corretora</p>
+        <p>Inclusões, exclusões e alterações de vidas + pagamentos</p>
       </div>
     </div>
-    <div class="nao-implementado">
-      <span class="ic">📤</span>
-      <b>O envio de planilha ainda não está implementado.</b><br>
-      Hoje os dados abaixo são carregados pelo comando <code>python -m app.seed</code>,
-      a partir da planilha <code>Base_Segurados_Central.xlsx</code>.<br>
-      A leitura automática de arquivos <code>.xlsx</code> enviados pela tela é um
-      próximo passo do projeto.
-    </div>
+
+    {# --- Resultado do último envio, se houve --- #}
+    {% if resumo %}
+      <div class="sucesso">
+        <b>✅ Planilha processada com sucesso.</b>
+        <div class="detalhe">
+          Arquivo: <b>{{ resumo.arquivo }}</b><br>
+          {{ resumo.gravados }} registro(s) gravado(s) na competência
+          <b>{{ resumo.competencias|join(', ') }}</b>.
+          {% if resumo.apagados %}
+            {{ resumo.apagados }} registro(s) anterior(es) desta competência
+            foram substituídos.
+          {% endif %}
+          <br>Prêmio total: <b>{{ reais(resumo.premio_total, 2) }}</b>.
+        </div>
+      </div>
+    {% endif %}
+
+    {# --- Erros e avisos da leitura --- #}
+    {% if erros %}
+      <div class="erro-lista">
+        <b>⚠️ {{ erros|length }} aviso(s) na leitura:</b>
+        <ul>
+          {% for e in erros[:15] %}<li>{{ e }}</li>{% endfor %}
+          {% if erros|length > 15 %}
+            <li>… e mais {{ erros|length - 15 }} aviso(s).</li>
+          {% endif %}
+        </ul>
+      </div>
+    {% endif %}
+
+    {# --- O formulário de envio ---
+       enctype="multipart/form-data" é OBRIGATÓRIO para enviar arquivo.
+       Sem isso, o navegador manda só o nome do arquivo, não o conteúdo. #}
+    <form method="post" action="/movimentacao/enviar" enctype="multipart/form-data">
+      <div class="upload">
+        <span class="ic">📤</span>
+        <b>Selecione a planilha de movimentação</b>
+        <p>Formato aceito: <code>.xlsx</code> (Excel) — até 5 MB</p>
+        <input type="file" name="arquivo" accept=".xlsx" required>
+        <button type="submit" class="btn-enviar">Enviar e processar</button>
+      </div>
+    </form>
+
+    <details class="ajuda">
+      <summary>Quais colunas a planilha precisa ter?</summary>
+      <p>
+        A primeira linha deve conter os títulos abaixo. A <b>ordem não importa</b>,
+        e acentos e maiúsculas são ignorados.
+      </p>
+      <table>
+        <thead><tr><th>Coluna</th><th>Obrigatória?</th></tr></thead>
+        <tbody>
+          <tr><td>NOME DO SEGURADO</td><td>Sim</td></tr>
+          <tr><td>NUMERO DA MATRICULA</td><td>Sim</td></tr>
+          <tr><td>VALOR DO PREMIO TOTAL/LIQUIDO</td><td>Sim</td></tr>
+          <tr><td>COMPETENCIA (dados pagamento)</td><td>Sim — formato MM/AAAA</td></tr>
+          <tr><td>NUMERO DO CPF</td><td>Não</td></tr>
+          <tr><td>DATA DE NASCIMENTO</td><td>Não</td></tr>
+          <tr><td>VALOR DO CAPITAL MORTE</td><td>Não</td></tr>
+          <tr><td>VALOR DO CAPITAL INVALIDEZ</td><td>Não</td></tr>
+          <tr><td>CODIGO DO MODULO</td><td>Não</td></tr>
+          <tr><td>CODIGO SUB</td><td>Não</td></tr>
+          <tr><td>SITUACAO DO PAGAMENTO</td><td>Não — Pago, A pagar ou Em atraso</td></tr>
+        </tbody>
+      </table>
+      <p>
+        <b>Atenção:</b> a planilha <b>substitui</b> a competência inteira.
+        Ao enviar a base de 08/2026, tudo que existia de 08/2026 é trocado
+        pelo conteúdo novo. As outras competências não são afetadas — por isso
+        você pode reenviar uma planilha corrigida sem duplicar nada.
+      </p>
+    </details>
   </div>
 
   {# ---------- 2. MOVIMENTACOES DO MES ---------- #}
@@ -39,7 +104,18 @@
         <h3>Movimentações do mês — competência {{ competencia }}</h3>
         <p>Base recebida da corretora · módulo 101 (risco morte/invalidez)</p>
       </div>
-      <div style="display:flex;gap:10px;align-items:center">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        {# Trocar a competência recarrega a página com a escolhida. #}
+        {% if competencias|length > 1 %}
+          <select class="search" style="width:auto"
+                  onchange="location.href='/movimentacao?competencia=' + encodeURIComponent(this.value)">
+            {% for c in competencias %}
+              <option value="{{ c }}" {% if c == competencia %}selected{% endif %}>
+                Competência {{ c }}
+              </option>
+            {% endfor %}
+          </select>
+        {% endif %}
         <input class="search" type="search"
                placeholder="Buscar segurado, CPF ou matrícula…"
                oninput="filtrarTabela(this, 'tabelaMovimentacao')">

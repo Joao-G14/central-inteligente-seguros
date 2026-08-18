@@ -113,8 +113,9 @@ verificar("  o cookie de sessao foi criado", "sessao_central" in r.cookies or
 
 r = cliente.get("/dashboard")
 verificar("  o dashboard abre depois do login", r.status_code == 200)
-verificar("  o dashboard mostra o nome do usuario", "Luciana Ferraz" in r.text)
-verificar("  o dashboard mostra o perfil", "ESTIPULANTE" in r.text)
+verificar("  o dashboard mostra o e-mail de quem entrou",
+          "estipulante@sebraeprev.com.br" in r.text)
+verificar("  o dashboard mostra a categoria", "ESTIPULANTE" in r.text)
 
 # ---------------------------------------------------------------
 # 4. O acesso foi registrado com data e hora?
@@ -146,44 +147,46 @@ verificar("  a tentativa foi registrada", contar_acessos() == antes + 1)
 registro = ultimo_acesso()
 verificar("  marcada como falha", registro is not None and not registro.sucesso)
 verificar("  o motivo real ficou no banco",
-          registro is not None and registro.motivo == "senha incorreta",
+          registro is not None and registro.motivo == "senha incorreta para a categoria",
           f"motivo: {registro.motivo if registro else '?'}")
 verificar("  mas a TELA nao revela qual campo errou",
           "senha incorreta" not in r.text.lower())
 
 # ---------------------------------------------------------------
-# 6. E-mail que nao existe
+# 6. E-mail livre — a regra atual do sistema
 # ---------------------------------------------------------------
-print("\n6. E-mail inexistente")
+print("\n6. E-mail livre (qualquer e-mail, com a senha da categoria)")
 
 antes = contar_acessos()
-r = entrar(TestClient(app), "ninguem@sebraeprev.com.br", "qualquer", "ESTIPULANTE")
-verificar("login recusado (401)", r.status_code == 401)
-verificar("  a tentativa foi registrada", contar_acessos() == antes + 1)
+c = TestClient(app)
+r = entrar(c, "ninguem.jamais.visto@gmail.com", config.SENHA_ESTIPULANTE, "ESTIPULANTE")
+verificar("e-mail que nao esta no banco ENTRA com a senha certa",
+          r.status_code == 303, f"veio {r.status_code}")
+verificar("  o acesso foi registrado", contar_acessos() == antes + 1)
 registro = ultimo_acesso()
-verificar("  motivo: e-mail nao encontrado",
-          registro is not None and registro.motivo == "e-mail nao encontrado")
-verificar("  sem usuario ligado (o e-mail nao existe)",
-          registro is not None and registro.user_id is None)
+verificar("  o e-mail digitado ficou guardado",
+          registro is not None and registro.email_informado == "ninguem.jamais.visto@gmail.com")
+verificar("  ficou ligado a categoria ESTIPULANTE",
+          registro is not None and registro.user_id is not None)
 
 # ---------------------------------------------------------------
-# 7. PERFIL ERRADO — o requisito principal do projeto
+# 7. SENHA DE UMA CATEGORIA NAO SERVE PARA OUTRA
 # ---------------------------------------------------------------
-print("\n7. Perfil errado (senha certa, perfil trocado)")
+print("\n7. Senha de uma categoria nao serve para outra")
 
-# A corretora tentando entrar como estipulante. Senha certa, perfil errado.
-antes = contar_acessos()
-r = entrar(TestClient(app), "corretora@sebraeprev.com.br", config.SENHA_CORRETORA, "ESTIPULANTE")
-verificar("corretora NAO entra como estipulante", r.status_code == 401, f"veio {r.status_code}")
+# Senha da corretora, tentando entrar como estipulante.
+r = entrar(TestClient(app), "alguem@empresa.com", config.SENHA_CORRETORA, "ESTIPULANTE")
+verificar("senha da CORRETORA nao entra como ESTIPULANTE",
+          r.status_code == 401, f"veio {r.status_code}")
 registro = ultimo_acesso()
-verificar("  motivo registrado como perfil incorreto",
-          registro is not None and registro.motivo.startswith("perfil nao corresponde"),
+verificar("  motivo registrado como senha incorreta",
+          registro is not None and registro.motivo == "senha incorreta para a categoria",
           f"motivo: {registro.motivo if registro else '?'}")
 
-# A mesma corretora com o perfil certo tem que entrar normalmente.
+# A mesma senha, na categoria certa, entra.
 c = TestClient(app)
-r = entrar(c, "corretora@sebraeprev.com.br", config.SENHA_CORRETORA, "CORRETORA")
-verificar("mas entra normalmente como CORRETORA",
+r = entrar(c, "alguem@empresa.com", config.SENHA_CORRETORA, "CORRETORA")
+verificar("mas a mesma senha entra em CORRETORA",
           r.status_code == 303 and r.headers.get("location") == "/dashboard")
 
 # Perfil inventado, enviado por fora da tela.

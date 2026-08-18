@@ -26,14 +26,16 @@ from datetime import date, timedelta
 import csv
 import io
 
-from fastapi import Depends, FastAPI, Form, Request
+from contextlib import asynccontextmanager
+
+from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app import assistente, auth
+from app import api, assistente, auth, config, planilha, seed
 from app.database import PASTA_RAIZ, get_db
 from app.menu import MENU, buscar_modulo
 from app.models import (
@@ -51,7 +53,41 @@ from app.models import (
     User,
 )
 
-app = FastAPI(title="Central Inteligente de Seguros")
+@asynccontextmanager
+async def ao_ligar_e_desligar(app: FastAPI):
+    """
+    Roda UMA VEZ quando o sistema liga.
+
+    Prepara o banco sozinho: cria as tabelas que faltarem e, se o banco
+    estiver vazio, carrega os dados iniciais.
+
+    É isto que permite subir o sistema num servidor sem abrir terminal
+    nenhum. No seu computador o efeito é o mesmo: se você apagar o
+    central.db por engano, ele volta ao ligar.
+    """
+    if config.CRIAR_BANCO_AO_INICIAR:
+        try:
+            if seed.garantir_banco():
+                print(">> Banco vazio: dados iniciais carregados.")
+            else:
+                print(">> Banco já tinha dados: nada foi alterado.")
+        except Exception as erro:
+            # Nao derrubamos o servidor por causa disso: avisamos alto e
+            # deixamos o site subir, senao fica impossivel diagnosticar.
+            print(f">> ERRO ao preparar o banco: {erro}")
+
+    yield  # daqui em diante o site esta no ar
+
+
+app = FastAPI(
+    title="Central Inteligente de Seguros",
+    description="Sistema de gestão de seguros de risco (morte e invalidez).",
+    version="1.0.0",
+    lifespan=ao_ligar_e_desligar,
+)
+
+# Liga a API de integração (todos os endereços começam com /api/v1).
+app.include_router(api.router)
 
 # Diz ao FastAPI onde estao o CSS/JS e as paginas HTML.
 app.mount("/static", StaticFiles(directory=PASTA_RAIZ / "static"), name="static")
@@ -90,10 +126,17 @@ def exigir_login(request: Request, db: Session = Depends(get_db)):
     """
     Usada em toda pagina de dentro do sistema.
 
-    Se houver alguem logado, devolve o usuario.
+    Se houver alguem logado, devolve a categoria de acesso.
     Se nao houver, devolve None — e a rota manda a pessoa para o /login.
+
+    Aproveitamos para pendurar o e-mail digitado no objeto, com o nome
+    email_acesso. E so um campo extra na memoria (nao vai para o banco)
+    e permite que a barra de cima mostre quem esta usando o sistema.
     """
-    return auth.ler_usuario_do_cookie(db, request)
+    usuario = auth.ler_usuario_do_cookie(db, request)
+    if usuario is not None:
+        usuario.email_acesso = auth.ler_email_do_cookie(request)
+    return usuario
 
 
 def formatar_reais(valor: float, casas: int = 0) -> str:
@@ -260,9 +303,10 @@ def processar_login(
             status_code=401,
         )
 
-    # Passos 5 e 6: cria o cracha e manda para o dashboard.
+    # Passos 5 e 6: cria o cracha (guardando o e-mail digitado) e manda
+    # para o dashboard.
     resposta = RedirectResponse("/dashboard", status_code=303)
-    auth.criar_cookie_sessao(resposta, usuario)
+    auth.criar_cookie_sessao(resposta, usuario, email=email.strip().lower())
     return resposta
 
 
@@ -450,18 +494,50 @@ def modulo_em_breve(
 # ===============================================================
 # MODULO: MOVIMENTACAO & PAGAMENTO
 # ===============================================================
-@app.get("/movimentacao", response_class=HTMLResponse)
-def movimentacao(
-    request: Request,
-    db: Session = Depends(get_db),
-    usuario: User | None = Depends(exigir_login),
-):
-    fora = barrar(usuario, "movimentacao")
-    if fora:
-        return fora
+def ordem_da_competencia(competencia: str) -> str:
+    """
+    Transforma "07/2026" em "2026-07", que ordena corretamente como texto.
 
-    pagamentos = db.query(Payment).order_by(Payment.matricula).all()
-    competencia = pagamentos[0].competencia if pagamentos else "—"
+    Sem isso, ordenar "07/2026" e "12/2025" alfabeticamente colocaria
+    julho antes de dezembro, o que esta errado.
+    """
+    if "/" in competencia:
+        mes, ano = competencia.split("/", 1)
+        return f"{ano}-{mes}"
+    return competencia
+
+
+def _tela_movimentacao(
+    request: Request,
+    db: Session,
+    usuario: User,
+    competencia: str | None = None,
+    resumo: dict | None = None,
+    erros: list[str] | None = None,
+):
+    """
+    Monta a tela de movimentacao.
+
+    Fica numa funcao separada porque TRES rotas precisam dela: abrir a
+    tela, enviar a planilha e trocar a competencia. Assim a montagem
+    existe em um lugar so.
+    """
+    # Quais competencias existem no banco, da mais nova para a mais antiga.
+    todas = [c[0] for c in db.query(Payment.competencia).distinct().all()]
+    todas.sort(key=ordem_da_competencia, reverse=True)
+
+    # Qual mostrar: a pedida, ou a mais recente.
+    if competencia not in todas:
+        competencia = todas[0] if todas else None
+
+    pagamentos = (
+        db.query(Payment)
+        .filter(Payment.competencia == competencia)
+        .order_by(Payment.matricula)
+        .all()
+        if competencia
+        else []
+    )
 
     totais = {
         "morte": sum(p.capital_morte for p in pagamentos),
@@ -469,8 +545,6 @@ def movimentacao(
         "premio": sum(p.premio for p in pagamentos),
     }
 
-    # joinedload nao e necessario aqui porque sao poucos registros;
-    # o SQLAlchemy busca o convenio de cada boleto quando o template pede.
     a_emitir = (
         db.query(Invoice)
         .filter(Invoice.status == "A emitir")
@@ -492,12 +566,85 @@ def movimentacao(
             usuario,
             "movimentacao",
             pagamentos=pagamentos,
-            competencia=competencia,
+            competencia=competencia or "—",
+            competencias=todas,
             totais=totais,
             a_emitir=a_emitir,
             emitidos=emitidos,
+            resumo=resumo,
+            erros=erros or [],
         ),
     )
+
+
+@app.get("/movimentacao", response_class=HTMLResponse)
+def movimentacao(
+    request: Request,
+    competencia: str | None = None,
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    fora = barrar(usuario, "movimentacao")
+    if fora:
+        return fora
+
+    return _tela_movimentacao(request, db, usuario, competencia=competencia)
+
+
+# Tamanho maximo do arquivo enviado, para nao derrubar o servidor.
+LIMITE_ARQUIVO_MB = 5
+
+
+@app.post("/movimentacao/enviar", response_class=HTMLResponse)
+async def enviar_planilha(
+    request: Request,
+    arquivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """
+    Recebe a planilha .xlsx enviada pela tela e grava no banco.
+
+    O caminho e sempre o mesmo:
+      1. confere se e um .xlsx e se nao e grande demais
+      2. LE o arquivo (nada e gravado ainda)
+      3. se a leitura achou linhas validas, GRAVA
+      4. volta para a tela mostrando o que aconteceu
+
+    Ler e gravar sao separados de proposito: se a planilha tiver
+    problema, o banco nem chega a ser tocado.
+    """
+    fora = barrar(usuario, "movimentacao")
+    if fora:
+        return fora
+
+    nome = (arquivo.filename or "").lower()
+    if not nome.endswith(".xlsx"):
+        return _tela_movimentacao(
+            request, db, usuario,
+            erros=[f'"{arquivo.filename}" não é um arquivo .xlsx do Excel. '
+                   f"Se a sua planilha for .xls ou .csv, abra no Excel e "
+                   f'salve como "Pasta de Trabalho do Excel (*.xlsx)".'],
+        )
+
+    conteudo = await arquivo.read()
+
+    if len(conteudo) > LIMITE_ARQUIVO_MB * 1024 * 1024:
+        return _tela_movimentacao(
+            request, db, usuario,
+            erros=[f"O arquivo tem mais de {LIMITE_ARQUIVO_MB} MB. "
+                   f"Envie uma planilha menor."],
+        )
+
+    registros, erros = planilha.ler_planilha(conteudo)
+
+    if not registros:
+        return _tela_movimentacao(request, db, usuario, erros=erros)
+
+    resumo = planilha.gravar(db, registros)
+    resumo["arquivo"] = arquivo.filename
+
+    return _tela_movimentacao(request, db, usuario, resumo=resumo, erros=erros)
 
 
 @app.post("/movimentacao/emitir/{boleto_id}")
@@ -987,9 +1134,25 @@ def produtos(
 # ===============================================================
 # MODULO: INTEGRACOES (API)
 # ===============================================================
+# Os enderecos da API que ja funcionam. Ficam aqui so para a tela
+# /integracoes conseguir listar; quem manda de verdade e o app/api.py.
+ENDPOINTS_DA_API = [
+    ("GET", "/api/v1/status", "Confere se a Central está no ar e traz os totais"),
+    ("GET", "/api/v1/indicadores", "Números consolidados da carteira"),
+    ("GET", "/api/v1/apolices", "Lista as apólices (filtra por status e vencimento)"),
+    ("GET", "/api/v1/apolices/{numero}", "Busca uma apólice pelo número"),
+    ("GET", "/api/v1/movimentacao", "Movimentação de uma competência"),
+    ("GET", "/api/v1/sinistros", "Sinistros em andamento"),
+    ("GET", "/api/v1/comissoes", "Comissões por competência"),
+    ("GET", "/api/v1/inadimplencia", "Participantes em atraso"),
+    ("POST", "/api/v1/movimentacao", "Recebe a movimentação enviada pela corretora"),
+]
+
 CONEXOES_PREVISTAS = [
-    {"icone": "📥", "nome": "Envio de planilha (atual)", "cor": "on", "situacao": "● Ativo",
-     "descricao": "Base recebida da corretora e carregada pelo comando do projeto — funciona hoje, sem integração"},
+    {"icone": "🔌", "nome": "API da Central", "cor": "on", "situacao": "● Ativo",
+     "descricao": "Publica os dados da carteira e recebe movimentação de sistemas parceiros"},
+    {"icone": "📥", "nome": "Envio de planilha", "cor": "on", "situacao": "● Ativo",
+     "descricao": "Base da corretora enviada em .xlsx pela tela de Movimentação & Pagamento"},
     {"icone": "🛡️", "nome": "API ICATU (seguradora)", "cor": "plan", "situacao": "Fase 3",
      "descricao": "Apólices, coberturas e sinistros sincronizados automaticamente"},
     {"icone": "🤝", "nome": "API Corretora", "cor": "plan", "situacao": "Fase 3",
@@ -1022,7 +1185,7 @@ def integracoes(
         request,
         "integracoes.html",
         contexto(usuario, "integracoes", conexoes=CONEXOES_PREVISTAS,
-                 prerequisitos=PRE_REQUISITOS),
+                 prerequisitos=PRE_REQUISITOS, endpoints=ENDPOINTS_DA_API),
     )
 
 

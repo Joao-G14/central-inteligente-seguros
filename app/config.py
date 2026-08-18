@@ -50,8 +50,31 @@ def ler(chave: str, padrao: str = "") -> str:
 # Chave usada para assinar o cookie de sessao do login (Fase 3).
 SECRET_KEY = ler("SECRET_KEY", "chave-insegura-apenas-para-desenvolvimento")
 
-# Senhas dos 3 usuarios ficticios de desenvolvimento.
-# Os valores reais ficam no .env; o que esta aqui e so um plano B.
+# A senha de cada CATEGORIA de acesso. Quem escolher a categoria na tela
+# de login e digitar a senha correspondente entra — o e-mail e livre.
 SENHA_ESTIPULANTE = ler("SENHA_ESTIPULANTE", "estipulante@sebraeprev")
 SENHA_CORRETORA = ler("SENHA_CORRETORA", "corretora@sebraeprev")
 SENHA_SEGURADORA = ler("SENHA_SEGURADORA", "seguradora@sebraeprev")
+
+# Chave que outros sistemas usam para conversar com a nossa API.
+# Quem nao mandar esta chave no cabecalho X-API-Key recebe "401 nao autorizado".
+API_KEY = ler("API_KEY", "")
+
+# --- Configuracoes que mudam entre o seu PC e o servidor ---
+#
+# AMBIENTE: "desenvolvimento" no seu computador, "producao" no servidor.
+# Em producao o sistema exige HTTPS no cookie e nao mostra detalhes de erro.
+AMBIENTE = ler("AMBIENTE", "desenvolvimento").lower()
+
+EM_PRODUCAO = AMBIENTE == "producao"
+
+# O cookie de sessao so deve viajar por HTTPS quando estiver no servidor.
+# No seu computador o endereco e http://127.0.0.1, sem S, entao aqui fica
+# desligado — senao o login nao funcionaria localmente.
+COOKIE_SEGURO = EM_PRODUCAO
+
+# Se True, o sistema cria as tabelas e carrega os dados iniciais sozinho
+# ao ligar. E o que permite subir num servidor sem rodar comando nenhum.
+CRIAR_BANCO_AO_INICIAR = ler("CRIAR_BANCO_AO_INICIAR", "sim").lower() in (
+    "sim", "true", "1", "yes"
+)

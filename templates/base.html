@@ -61,8 +61,8 @@
     </ul>
 
     <div class="side-foot">
-      Programa Prev IA · 1º Ciclo
-      <span class="badge-mvp">EM DESENVOLVIMENTO — DADOS FICTÍCIOS</span>
+      Sebrae Previdência
+      <span class="badge-mvp">CENTRAL DE SEGUROS · v1.0</span>
     </div>
   </aside>
 
@@ -76,11 +76,14 @@
       </div>
 
       <div class="who">
-        {# as iniciais do nome, ex.: "Luciana Ferraz" -> "LF" #}
-        <div class="avatar">{{ usuario.nome.split()[0][0] }}{{ usuario.nome.split()[-1][0] }}</div>
+        {# A inicial de quem entrou. Se o e-mail for "joao@x.com", vira "J". #}
+        <div class="avatar">
+          {{ (usuario.email_acesso or usuario.nome)[0]|upper }}
+        </div>
         <div>
-          <span class="nome">{{ usuario.nome }}</span>
-          <span class="perfil">{{ usuario.perfil }}</span>
+          {# Em cima o e-mail de quem entrou; embaixo a categoria de acesso. #}
+          <span class="nome">{{ usuario.email_acesso or usuario.nome }}</span>
+          <span class="perfil">{{ usuario.nome }}</span>
         </div>
         <form method="post" action="/logout">
           <button type="submit" class="btn-sair">Sair</button>
