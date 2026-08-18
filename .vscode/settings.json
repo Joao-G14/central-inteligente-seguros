@@ -1,0 +1,20 @@
+{
+  // Aponta o VS Code para o Python de dentro do venv do projeto.
+  // ${workspaceFolder} = a pasta do projeto, seja qual for o computador.
+  // Sem isso, seria preciso selecionar o interpretador a mao toda vez.
+  "python.defaultInterpreterPath": "${workspaceFolder}\\venv\\Scripts\\python.exe",
+
+  // Ativa o venv sozinho quando voce abre um terminal novo no VS Code.
+  "python.terminal.activateEnvironment": true,
+
+  // Nao mostra as pastas de arquivos temporarios do Python na lateral.
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true
+  },
+
+  // Arquivos .html dentro de templates/ usam Jinja2 (a sintaxe {{ }} e {% %}).
+  "files.associations": {
+    "templates/*.html": "jinja-html"
+  }
+}

@@ -1,0 +1,90 @@
+{# ==================================================================
+   login.html — a tela de entrada do sistema
+   ==================================================================
+   Esta pagina NAO usa o base.html, porque ela nao tem menu lateral
+   nem barra de cima: e uma tela solta, antes de entrar no sistema.
+   ================================================================== #}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entrar — Central Inteligente de Seguros</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="tela-login">
+
+  <form class="login-card" method="post" action="/login">
+
+    <div class="login-marca">
+      <div class="logo">SP</div>
+      <div>
+        <b>Central de Seguros</b>
+        <span>Sebrae Previdência</span>
+      </div>
+    </div>
+
+    <p class="login-titulo">Escolha seu tipo de acesso e entre com seus dados.</p>
+
+    {# Se o login falhou, o main.py manda a variavel "erro" e ela aparece aqui. #}
+    {% if erro %}
+      <div class="erro">
+        <span>⚠️</span>
+        <span>{{ erro }}</span>
+      </div>
+    {% endif %}
+
+    {# ---------- OS 3 PERFIS ----------
+       Sao 3 botoes de radio: so um pode ficar marcado.
+       O "value" e o que o servidor recebe; o texto e o que a pessoa ve.
+       O perfil marcado continua marcado depois de um erro, para a pessoa
+       nao ter que escolher de novo. #}
+    <div class="perfis">
+      <input type="radio" name="perfil" id="p1" value="ESTIPULANTE"
+             {% if perfil_marcado == 'ESTIPULANTE' or not perfil_marcado %}checked{% endif %}>
+      <label for="p1"><span class="icone">🏢</span>Estipulante</label>
+
+      <input type="radio" name="perfil" id="p2" value="CORRETORA"
+             {% if perfil_marcado == 'CORRETORA' %}checked{% endif %}>
+      <label for="p2"><span class="icone">🤝</span>Corretora</label>
+
+      <input type="radio" name="perfil" id="p3" value="SEGURADORA"
+             {% if perfil_marcado == 'SEGURADORA' %}checked{% endif %}>
+      <label for="p3"><span class="icone">🛡️</span>Seguradora</label>
+    </div>
+
+    {# ---------- E-MAIL E SENHA ---------- #}
+    <div class="campo">
+      <label for="email">E-mail</label>
+      {# required = o navegador nao deixa enviar vazio
+         autofocus = o cursor ja comeca neste campo #}
+      <input type="email" id="email" name="email"
+             value="{{ email_digitado or '' }}"
+             placeholder="seu.email@sebraeprev.com.br"
+             required autofocus>
+    </div>
+
+    <div class="campo">
+      <label for="senha">Senha</label>
+      {# type="password" faz o navegador esconder o que e digitado #}
+      <input type="password" id="senha" name="senha"
+             placeholder="••••••••" required>
+    </div>
+
+    <button type="submit" class="btn-entrar">Entrar</button>
+
+    {# ---------- LEMBRETE DOS USUARIOS DE TESTE ----------
+       Isto existe so enquanto o sistema esta em desenvolvimento.
+       Antes de colocar no ar de verdade, este bloco deve ser apagado. #}
+    <div class="aviso-demo">
+      <b>Ambiente de desenvolvimento — dados fictícios</b>
+      Estipulante: <code>estipulante@sebraeprev.com.br</code><br>
+      Corretora: <code>corretora@sebraeprev.com.br</code><br>
+      Seguradora: <code>seguradora@sebraeprev.com.br</code><br>
+      A senha de cada um é o e-mail sem <code>.com.br</code>
+    </div>
+
+  </form>
+
+</body>
+</html>

@@ -1,0 +1,184 @@
+{# ==================================================================
+   movimentacao.html — Movimentacao & Pagamento
+   ==================================================================
+   Tres paineis:
+     1. envio da planilha (ainda nao implementado)
+     2. movimentacoes do mes (tabela payments)
+     3. boletos por convenio (tabelas agreements + invoices)
+   ================================================================== #}
+{% extends "base.html" %}
+
+{% block titulo %}Movimentação & Pagamento — Central de Seguros{% endblock %}
+{% block cabecalho %}Movimentação & Pagamento{% endblock %}
+{% block subcabecalho %}Inclusões, exclusões e alterações de vidas + pagamentos{% endblock %}
+
+{% block conteudo %}
+
+  {# ---------- 1. ENVIO DA PLANILHA ---------- #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Envio da planilha de movimentação</h3>
+        <p>Base enviada mensalmente pela corretora</p>
+      </div>
+    </div>
+    <div class="nao-implementado">
+      <span class="ic">📤</span>
+      <b>O envio de planilha ainda não está implementado.</b><br>
+      Hoje os dados abaixo são carregados pelo comando <code>python -m app.seed</code>,
+      a partir da planilha <code>Base_Segurados_Central.xlsx</code>.<br>
+      A leitura automática de arquivos <code>.xlsx</code> enviados pela tela é um
+      próximo passo do projeto.
+    </div>
+  </div>
+
+  {# ---------- 2. MOVIMENTACOES DO MES ---------- #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Movimentações do mês — competência {{ competencia }}</h3>
+        <p>Base recebida da corretora · módulo 101 (risco morte/invalidez)</p>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <input class="search" type="search"
+               placeholder="Buscar segurado, CPF ou matrícula…"
+               oninput="filtrarTabela(this, 'tabelaMovimentacao')">
+        {# Este botao baixa um arquivo .csv de verdade, que abre no Excel. #}
+        <a class="exp-btn" href="/movimentacao/exportar" download>⬇ Excel</a>
+      </div>
+    </div>
+
+    <div class="tabela-rolagem">
+      <table id="tabelaMovimentacao">
+        <thead>
+          <tr>
+            <th>Matrícula</th>
+            <th>Segurado</th>
+            <th>CPF</th>
+            <th class="num">Cap. Morte</th>
+            <th class="num">Cap. Invalidez</th>
+            <th class="num">Prêmio</th>
+            <th>Mód/Sub</th>
+            <th>Pagamento</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in pagamentos %}
+            <tr>
+              <td>{{ p.matricula }}</td>
+              <td>{{ p.segurado }}</td>
+              <td>{{ p.cpf }}</td>
+              <td class="num">{{ reais(p.capital_morte) }}</td>
+              <td class="num">{{ reais(p.capital_invalidez) }}</td>
+              <td class="num">{{ reais(p.premio, 2) }}</td>
+              <td>{{ p.codigo_modulo }} · {{ p.codigo_sub }}</td>
+              <td>
+                {% if p.status == 'Pago' %}
+                  <span class="pill ok">Pago</span>
+                {% elif p.status == 'A pagar' %}
+                  <span class="pill warn">A pagar</span>
+                {% else %}
+                  <span class="pill late">Em atraso</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="8" class="vazio">Nenhuma movimentação nesta competência.</td></tr>
+          {% endfor %}
+        </tbody>
+        {% if pagamentos %}
+          <tfoot>
+            <tr>
+              <td colspan="3" style="text-align:right">TOTAL ({{ pagamentos|length }} segurados)</td>
+              <td class="num">{{ reais(totais.morte) }}</td>
+              <td class="num">{{ reais(totais.invalidez) }}</td>
+              <td class="num">{{ reais(totais.premio, 2) }}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+
+  {# ---------- 3. BOLETOS A EMITIR ---------- #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Emissão de boletos por convênio</h3>
+        <p>Boletos segregados por convênio e competência</p>
+      </div>
+    </div>
+
+    <div class="compbar">
+      <span class="pill blue">Competência {{ competencia }}</span>
+      <span style="color:var(--muted);font-size:12px">
+        {{ a_emitir|length }} boleto(s) aguardando emissão
+      </span>
+    </div>
+
+    <div class="conv-grid">
+      {% for boleto in a_emitir %}
+        <div class="conv">
+          <h4>{{ boleto.convenio.nome }}</h4>
+          <div class="cd">Convênio · {{ boleto.convenio.descricao }}</div>
+          <div class="row"><span>Vidas</span><span>{{ "{:,}".format(boleto.vidas).replace(",", ".") }}</span></div>
+          <div class="row"><span>Movimentações</span><span>{{ boleto.movimentacoes }}</span></div>
+          <div class="tot"><span>Total</span><b>{{ reais(boleto.valor) }}</b></div>
+          {# Emitir o boleto muda o status no banco de verdade.
+             Usamos POST (e nao um link) porque a acao ALTERA dados. #}
+          <form method="post" action="/movimentacao/emitir/{{ boleto.id }}">
+            <button type="submit">Emitir boleto</button>
+          </form>
+        </div>
+      {% else %}
+        <p class="vazio">Todos os boletos desta competência já foram emitidos.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ---------- 4. BOLETOS JA EMITIDOS ---------- #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Boletos emitidos</h3>
+        <p>Histórico por convênio e competência</p>
+      </div>
+    </div>
+    <div class="tabela-rolagem">
+      <table>
+        <thead>
+          <tr>
+            <th>Convênio</th>
+            <th>Competência</th>
+            <th class="num">Vidas</th>
+            <th class="num">Valor</th>
+            <th>Vencimento</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for boleto in emitidos %}
+            <tr>
+              <td>{{ boleto.convenio.nome }}</td>
+              <td>{{ boleto.competencia }}</td>
+              <td class="num">{{ "{:,}".format(boleto.vidas).replace(",", ".") }}</td>
+              <td class="num">{{ reais(boleto.valor) }}</td>
+              <td>{{ boleto.data_vencimento.strftime('%d/%m/%Y') if boleto.data_vencimento else '—' }}</td>
+              <td>
+                {% if boleto.status == 'Pago' %}
+                  <span class="pill ok">Pago</span>
+                {% else %}
+                  <span class="pill warn">Em aberto</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="vazio">Nenhum boleto emitido ainda.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+{% endblock %}

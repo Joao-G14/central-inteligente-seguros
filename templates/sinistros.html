@@ -1,0 +1,88 @@
+{# ==================================================================
+   sinistros.html — Sinistros
+   ==================================================================
+   ATENCAO: a CORRETORA nao tem acesso a esta tela (regra do projeto).
+   ================================================================== #}
+{% extends "base.html" %}
+
+{% block titulo %}Sinistros — Central de Seguros{% endblock %}
+{% block cabecalho %}Sinistros{% endblock %}
+{% block subcabecalho %}Acompanhamento dos pedidos de morte e invalidez{% endblock %}
+
+{% block conteudo %}
+
+  <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi">
+      <div class="lbl">Sinistros em andamento</div>
+      <div class="val">{{ kpis.em_andamento }}</div>
+      <div class="delta warn">● {{ kpis.com_pendencia }} com documentação pendente</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Documentação completa</div>
+      <div class="val">{{ kpis.doc_ok }}</div>
+      <div class="delta up">prontos para seguir</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Tempo médio em aberto</div>
+      <div class="val">{{ kpis.tempo_medio }} <span style="font-size:15px">dias</span></div>
+      <div class="delta">desde a abertura</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Sinistros em andamento</h3>
+        <p>Morte e invalidez — ordenados do mais antigo para o mais recente</p>
+      </div>
+      <input class="search" type="search" placeholder="Buscar protocolo ou participante…"
+             oninput="filtrarTabela(this, 'tabelaSinistros')">
+    </div>
+
+    <div class="tabela-rolagem">
+      <table id="tabelaSinistros">
+        <thead>
+          <tr>
+            <th>Protocolo</th>
+            <th>Participante</th>
+            <th>Tipo</th>
+            <th>Aberto em</th>
+            <th class="num">Dias em aberto</th>
+            <th>Documentação</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in sinistros %}
+            <tr>
+              <td>{{ s.protocolo }}</td>
+              <td>{{ s.participante }}</td>
+              <td>{{ s.tipo }}</td>
+              <td>{{ s.data_abertura.strftime('%d/%m/%Y') }}</td>
+              <td class="num">{{ s.dias_em_aberto(hoje) }}</td>
+              <td>
+                {% if s.documentacao_ok %}
+                  <span class="pill ok">{{ s.documentacao }}</span>
+                {% else %}
+                  <span class="pill late">{{ s.documentacao }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if s.status == 'Em liberação' %}
+                  <span class="pill blue">{{ s.status }}</span>
+                {% elif s.status == 'Concluído' %}
+                  <span class="pill ok">{{ s.status }}</span>
+                {% else %}
+                  <span class="pill warn">{{ s.status }}</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7" class="vazio">Nenhum sinistro em andamento.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+{% endblock %}

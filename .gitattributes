@@ -1,0 +1,18 @@
+# Padroniza a quebra de linha dos arquivos de texto.
+#
+# Windows e Linux marcam o fim de linha de jeitos diferentes. Sem este
+# arquivo, o Git fica avisando "LF will be replaced by CRLF" e, se voce
+# e seu colega usarem sistemas diferentes, o Git acha que o arquivo
+# inteiro mudou quando na verdade nada mudou.
+#
+# text=auto: o Git normaliza tudo internamente e resolve sozinho.
+* text=auto
+
+# Arquivos binarios: o Git nao deve tentar mexer neles.
+*.png binary
+*.jpg binary
+*.mp4 binary
+*.xlsx binary
+*.docx binary
+*.pptx binary
+*.db binary

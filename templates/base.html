@@ -1,0 +1,100 @@
+{# ==================================================================
+   base.html — o "molde" das paginas de dentro do sistema
+   ==================================================================
+   Todas as telas (dashboard, carteira, etc.) reaproveitam este arquivo:
+   o menu lateral e a barra de cima ficam aqui, uma vez so.
+
+   Cada pagina escreve apenas o seu miolo, assim:
+
+       {% extends "base.html" %}
+       {% block conteudo %}
+         ...o conteudo da pagina...
+       {% endblock %}
+
+   Isso e o Jinja2. As marcas {% %} sao comandos e {{ }} mostram valores.
+   ================================================================== #}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block titulo %}Central Inteligente de Seguros{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="app">
+
+  {# ---------- MENU LATERAL ---------- #}
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">SP</div>
+      <div>
+        <b>Central de Seguros</b>
+        <span>Sebrae Previdência</span>
+      </div>
+    </div>
+
+    <ul class="nav">
+      {% for item in menu %}
+        {% if item.permitido %}
+          {# o perfil pode acessar: vira link normal #}
+          <li>
+            <a href="{{ item.url }}"
+               class="{% if item.chave == modulo_atual %}active{% endif %}">
+              <svg viewBox="0 0 24 24" width="18" height="18"
+                   fill="none" stroke="currentColor" stroke-width="1.9">{{ item.icone|safe }}</svg>
+              {{ item.titulo }}
+            </a>
+          </li>
+        {% else %}
+          {# o perfil NAO pode acessar: aparece apagado, com cadeado #}
+          <li>
+            <span class="bloqueado" title="Seu perfil não tem acesso a este módulo">
+              <svg viewBox="0 0 24 24" width="18" height="18"
+                   fill="none" stroke="currentColor" stroke-width="1.9">{{ item.icone|safe }}</svg>
+              {{ item.titulo }}
+              <span class="cadeado">🔒</span>
+            </span>
+          </li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+
+    <div class="side-foot">
+      Programa Prev IA · 1º Ciclo
+      <span class="badge-mvp">EM DESENVOLVIMENTO — DADOS FICTÍCIOS</span>
+    </div>
+  </aside>
+
+  {# ---------- AREA PRINCIPAL ---------- #}
+  <div class="main">
+
+    <div class="top">
+      <div>
+        <h1>{% block cabecalho %}{% endblock %}</h1>
+        <div class="sub">{% block subcabecalho %}{% endblock %}</div>
+      </div>
+
+      <div class="who">
+        {# as iniciais do nome, ex.: "Luciana Ferraz" -> "LF" #}
+        <div class="avatar">{{ usuario.nome.split()[0][0] }}{{ usuario.nome.split()[-1][0] }}</div>
+        <div>
+          <span class="nome">{{ usuario.nome }}</span>
+          <span class="perfil">{{ usuario.perfil }}</span>
+        </div>
+        <form method="post" action="/logout">
+          <button type="submit" class="btn-sair">Sair</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="content">
+      {% block conteudo %}{% endblock %}
+    </div>
+
+  </div>
+</div>
+
+<script src="/static/js/main.js"></script>
+</body>
+</html>

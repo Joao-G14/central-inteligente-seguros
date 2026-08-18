@@ -1,0 +1,101 @@
+{# ==================================================================
+   esteira.html — Esteira de aceitacao de apolices
+   ==================================================================
+   Um quadro (kanban) com 4 colunas, mostrando em que ponto do fluxo
+   cada proposta esta: recebida -> analise -> aceita / pendente.
+   ================================================================== #}
+{% extends "base.html" %}
+
+{% block titulo %}Esteira de Apólices — Central de Seguros{% endblock %}
+{% block cabecalho %}Esteira de Apólices{% endblock %}
+{% block subcabecalho %}Fluxo de subscrição: proposta → análise → decisão{% endblock %}
+
+{% block conteudo %}
+
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Esteira de aceitação de apólices</h3>
+        <p>{{ total }} propostas em andamento</p>
+      </div>
+    </div>
+
+    <div class="board">
+      {# A lista "colunas" vem do main.py, ja separada por etapa. #}
+      {% for coluna in colunas %}
+        <div class="col">
+          <div class="col-h">
+            <b>{{ coluna.titulo }}</b>
+            <span class="cnt">{{ coluna.propostas|length }}</span>
+          </div>
+
+          {% for p in coluna.propostas %}
+            {# a cor da barrinha esquerda depende da situacao #}
+            <div class="card-mini {{ 'rec' if p.recusada else coluna.cor }}">
+              <div class="ap">{{ p.numero }}</div>
+              <div class="nm">{{ p.participante }}</div>
+              <div class="mt">
+                {% if p.cobertura %}<span>{{ p.cobertura }}</span>{% endif %}
+                {% if p.capital %}<span>{{ capital_curto(p.capital) }}</span>{% endif %}
+                {% if p.observacao %}<span>{{ p.observacao }}</span>{% endif %}
+              </div>
+            </div>
+          {% else %}
+            <p class="vazio" style="padding:14px 4px">Nenhuma proposta.</p>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ---------- LISTA COMPLETA ---------- #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Todas as propostas</h3>
+        <p>Mesma informação do quadro, em formato de lista</p>
+      </div>
+      <input class="search" type="search" placeholder="Buscar proposta ou participante…"
+             oninput="filtrarTabela(this, 'tabelaPropostas')">
+    </div>
+    <div class="tabela-rolagem">
+      <table id="tabelaPropostas">
+        <thead>
+          <tr>
+            <th>Proposta</th>
+            <th>Participante</th>
+            <th>Cobertura</th>
+            <th class="num">Capital</th>
+            <th>Etapa</th>
+            <th>Observação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in propostas %}
+            <tr>
+              <td>{{ p.numero }}</td>
+              <td>{{ p.participante }}</td>
+              <td>{{ p.cobertura or '—' }}</td>
+              <td class="num">{{ reais(p.capital) if p.capital else '—' }}</td>
+              <td>
+                {% if p.recusada %}
+                  <span class="pill late">Recusada</span>
+                {% elif p.etapa == 'aceita' %}
+                  <span class="pill ok">Aceita</span>
+                {% elif p.etapa == 'pendente' %}
+                  <span class="pill warn">Pendente</span>
+                {% elif p.etapa == 'analise' %}
+                  <span class="pill blue">Em análise</span>
+                {% else %}
+                  <span class="pill cinza">Recebida</span>
+                {% endif %}
+              </td>
+              <td>{{ p.observacao or '—' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+{% endblock %}

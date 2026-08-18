@@ -1,0 +1,32 @@
+{# ==================================================================
+   em_breve.html — pagina provisoria dos modulos ainda nao convertidos
+   ==================================================================
+   Serve para o menu do prototipo continuar completo enquanto voces
+   convertem um modulo por vez na Fase 4.
+
+   Quando um modulo ficar pronto, e so trocar "pronto": False para
+   "pronto": True no arquivo app/menu.py e criar a pagina dele.
+   ================================================================== #}
+{% extends "base.html" %}
+
+{% block titulo %}{{ modulo.titulo }} — Central de Seguros{% endblock %}
+{% block cabecalho %}{{ modulo.titulo }}{% endblock %}
+{% block subcabecalho %}Módulo ainda não implementado{% endblock %}
+
+{% block conteudo %}
+
+  <div class="panel">
+    <div class="em-breve">
+      <div class="icone">🚧</div>
+      <h2>Em construção</h2>
+      <p>
+        O módulo <b>{{ modulo.titulo }}</b> existe no protótipo, mas ainda não
+        foi transformado em página funcional.
+        <br><br>
+        Ele entra na <b>Fase 4</b> do projeto, quando cada tela do protótipo
+        for convertida para ler os dados do banco.
+      </p>
+    </div>
+  </div>
+
+{% endblock %}

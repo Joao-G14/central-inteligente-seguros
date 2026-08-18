@@ -1,0 +1,224 @@
+"""
+auth.py
+-------
+Tudo que envolve SENHA, LOGIN e PERMISSAO fica aqui.
+
+O arquivo tem 4 partes:
+  1. Senhas       — gerar_hash() e conferir_senha()
+  2. Login        — autenticar() e registrar_login()
+  3. Sessao       — quem esta logado agora (cookie assinado)
+  4. Permissoes   — o que cada perfil pode acessar
+
+POR QUE HASH?
+Se guardassemos a senha como "senha123" no banco, qualquer pessoa que
+abrisse o arquivo central.db leria a senha de todo mundo. O hash e um
+embaralhamento de mao unica: da senha da para chegar no hash, mas do
+hash NAO da para voltar para a senha.
+"""
+
+import bcrypt
+from itsdangerous import BadSignature, URLSafeSerializer
+
+from app import config
+from app.models import LoginHistory, User
+
+# ===============================================================
+# PARTE 1: SENHAS
+# ===============================================================
+
+# O bcrypt so aceita senhas de ate 72 bytes. Senhas maiores dao erro.
+LIMITE_BYTES_BCRYPT = 72
+
+
+def _para_bytes(senha: str) -> bytes:
+    """
+    O bcrypt trabalha com bytes, nao com texto. Esta funcao converte
+    e corta no limite de 72 bytes para nunca dar erro.
+
+    O "_" no inicio do nome e uma convencao Python que significa:
+    "esta funcao e de uso interno deste arquivo".
+    """
+    return senha.encode("utf-8")[:LIMITE_BYTES_BCRYPT]
+
+
+def gerar_hash(senha: str) -> str:
+    """
+    Recebe a senha em texto e devolve o hash para guardar no banco.
+
+    Exemplo:
+        gerar_hash("senha123")
+        -> '$2b$12$CzHJOTXqPGX.akyY01nVne...'
+
+    Rodar duas vezes com a mesma senha da hashes DIFERENTES, porque o
+    bcrypt sorteia um "sal" (gensalt) a cada chamada. Isso e proposital
+    e deixa o sistema mais seguro.
+    """
+    hash_em_bytes = bcrypt.hashpw(_para_bytes(senha), bcrypt.gensalt())
+    return hash_em_bytes.decode("utf-8")
+
+
+def conferir_senha(senha_digitada: str, hash_do_banco: str) -> bool:
+    """
+    Confere se a senha digitada corresponde ao hash guardado.
+    Devolve True (bate) ou False (nao bate).
+
+    O try/except existe porque, se o hash estiver corrompido ou vazio,
+    o bcrypt levanta um erro. Preferimos responder False a quebrar a tela.
+    """
+    try:
+        return bcrypt.checkpw(
+            _para_bytes(senha_digitada),
+            hash_do_banco.encode("utf-8"),
+        )
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
+# ===============================================================
+# PARTE 2: LOGIN
+# ===============================================================
+def autenticar(db, email: str, senha: str, perfil: str) -> tuple[User | None, str]:
+    """
+    Faz as 3 conferencias do login, nesta ordem:
+
+      1. o e-mail existe?
+      2. a senha confere?
+      3. o perfil escolhido na tela e o mesmo do cadastro?
+
+    Devolve DOIS valores:
+      - o usuario (ou None, se algo falhou)
+      - o motivo da falha (ou "" se deu tudo certo)
+
+    O motivo e guardado no login_history e serve para auditoria.
+
+    IMPORTANTE: a mensagem mostrada na TELA e sempre generica
+    ("E-mail, senha ou perfil incorretos"). Se a tela dissesse
+    "senha incorreta", estariamos confirmando para um invasor que
+    aquele e-mail existe no sistema.
+    """
+    email = (email or "").strip().lower()
+
+    # 1. o e-mail existe?
+    usuario = db.query(User).filter(User.email == email).first()
+    if usuario is None:
+        return None, "e-mail nao encontrado"
+
+    # 2. a senha confere?
+    if not conferir_senha(senha, usuario.senha_hash):
+        return None, "senha incorreta"
+
+    # 3. o perfil escolhido bate com o do cadastro?
+    if usuario.perfil != perfil:
+        return None, f"perfil nao corresponde (cadastrado: {usuario.perfil})"
+
+    # 4. a conta esta ativa?
+    if not usuario.ativo:
+        return None, "usuario inativo"
+
+    return usuario, ""
+
+
+def registrar_login(
+    db,
+    email: str,
+    perfil: str,
+    sucesso: bool,
+    motivo: str = "",
+    usuario: User | None = None,
+    ip: str | None = None,
+) -> None:
+    """
+    Grava a tentativa de acesso na tabela login_history.
+
+    Registramos TODAS as tentativas, inclusive as que falharam. Isso
+    atende o requisito de "registrar data e hora do login" e ainda
+    permite perceber tentativas de acesso indevido.
+
+    A data e hora sao preenchidas sozinhas pelo banco (veja models.py).
+    """
+    db.add(
+        LoginHistory(
+            user_id=usuario.id if usuario else None,
+            email_informado=(email or "").strip().lower(),
+            perfil_informado=perfil or "",
+            sucesso=sucesso,
+            motivo=motivo or None,
+            ip=ip,
+        )
+    )
+    db.commit()
+
+
+# ===============================================================
+# PARTE 3: SESSAO (lembrar quem esta logado)
+# ===============================================================
+# COMO FUNCIONA, EM UMA FRASE:
+# depois do login, mandamos para o navegador um "cracha" (cookie) com o
+# numero do usuario. Esse cracha vai ASSINADO com a SECRET_KEY, entao se
+# alguem tentar editar o numero na marra, a assinatura quebra e o cracha
+# e recusado.
+
+NOME_DO_COOKIE = "sessao_central"
+
+_assinador = URLSafeSerializer(config.SECRET_KEY, salt="sessao-central-seguros")
+
+
+def criar_cookie_sessao(resposta, usuario: User) -> None:
+    """Coloca o cracha assinado na resposta que vai para o navegador."""
+    valor = _assinador.dumps({"user_id": usuario.id})
+    resposta.set_cookie(
+        key=NOME_DO_COOKIE,
+        value=valor,
+        httponly=True,   # o JavaScript da pagina nao consegue ler o cookie
+        samesite="lax",  # o cookie nao e enviado a partir de outros sites
+        max_age=60 * 60 * 8,  # vale por 8 horas
+    )
+
+
+def apagar_cookie_sessao(resposta) -> None:
+    """Tira o cracha do navegador (usado no logout)."""
+    resposta.delete_cookie(NOME_DO_COOKIE)
+
+
+def ler_usuario_do_cookie(db, request) -> User | None:
+    """
+    Le o cracha e devolve o usuario correspondente.
+
+    Devolve None se: nao ha cookie, a assinatura nao confere,
+    o usuario foi apagado do banco ou esta inativo.
+    """
+    valor = request.cookies.get(NOME_DO_COOKIE)
+    if not valor:
+        return None
+
+    try:
+        dados = _assinador.loads(valor)
+    except BadSignature:
+        return None  # cookie adulterado ou assinado com outra chave
+
+    usuario = db.query(User).filter(User.id == dados.get("user_id")).first()
+    if usuario is None or not usuario.ativo:
+        return None
+
+    return usuario
+
+
+# ===============================================================
+# PARTE 4: PERMISSOES
+# ===============================================================
+# Regra simples: cada perfil tem uma LISTA do que NAO pode acessar.
+# Lista vazia = pode tudo.
+#
+# As regras vieram do enunciado do projeto:
+#   CORRETORA   nao acessa sinistros
+#   SEGURADORA  nao acessa comissoes nem inadimplencia
+MODULOS_BLOQUEADOS = {
+    "ESTIPULANTE": [],
+    "CORRETORA": ["sinistros"],
+    "SEGURADORA": ["comissoes", "inadimplencia"],
+}
+
+
+def pode_acessar(perfil: str, modulo: str) -> bool:
+    """Responde True ou False para 'este perfil pode abrir este modulo?'."""
+    return modulo not in MODULOS_BLOQUEADOS.get(perfil, [])

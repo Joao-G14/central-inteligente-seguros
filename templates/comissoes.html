@@ -1,0 +1,103 @@
+{# ==================================================================
+   comissoes.html — Painel de Comissoes
+   ==================================================================
+   Mostra como o premio arrecadado no mes e dividido entre os 3 agentes,
+   e o historico do repasse ao estipulante nos ultimos meses.
+
+   ATENCAO: a SEGURADORA nao tem acesso a esta tela (regra do projeto).
+   A trava esta no app/main.py, nao aqui.
+   ================================================================== #}
+{% extends "base.html" %}
+
+{% block titulo %}Comissões — Central de Seguros{% endblock %}
+{% block cabecalho %}Painel de Comissões{% endblock %}
+{% block subcabecalho %}Divisão do prêmio arrecadado entre estipulante, corretora e seguradora{% endblock %}
+
+{% block conteudo %}
+
+  {# ---------- OS 3 CARTOES ---------- #}
+  <div class="panel" style="background:linear-gradient(90deg,#F4F8FD,#fff)">
+    <div class="ph">
+      <div>
+        <h3>Comissões — competência {{ competencia }}</h3>
+        <p>Divisão sobre o prêmio arrecadado no mês: <b>{{ reais(premio_total) }}</b></p>
+      </div>
+    </div>
+
+    <div class="comm-grid">
+      {% for c in comissoes %}
+        {# a classe muda a cor da borda de cima de cada cartao #}
+        <div class="comm {% if c.papel == 'CORRETORA' %}corr{% elif c.papel == 'SEGURADORA' %}seg{% endif %}">
+          <div class="role">{{ c.papel|capitalize }}</div>
+          <div class="who2">{{ c.quem }}</div>
+          <div class="amt">{{ reais(c.valor) }}</div>
+          <div class="pct">{{ c.descricao }}</div>
+          {# a barrinha embaixo tem a largura da porcentagem #}
+          <div class="prog"><i style="width:{{ c.percentual }}%"></i></div>
+        </div>
+      {% else %}
+        <p class="vazio">Nenhuma comissão registrada nesta competência.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ---------- HISTORICO EM BARRAS ---------- #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Histórico de comissões do estipulante</h3>
+        <p>Repasse mensal ao Sebrae Previdência</p>
+      </div>
+    </div>
+
+    <div class="bars">
+      {% for mes in historico %}
+        <div class="bar-wrap">
+          <div class="bar-val">{{ reais(mes.valor) }}</div>
+          <div class="bar-col">
+            {# a altura da barra e proporcional ao maior mes #}
+            <div class="bar" style="height:{{ mes.altura }}%"></div>
+          </div>
+          <div class="bar-lbl">{{ mes.rotulo }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ---------- TABELA COMPLETA ---------- #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Detalhamento por competência</h3>
+        <p>Todos os meses e todos os agentes</p>
+      </div>
+    </div>
+    <div class="tabela-rolagem">
+      <table>
+        <thead>
+          <tr>
+            <th>Competência</th>
+            <th>Agente</th>
+            <th>Quem recebe</th>
+            <th class="num">Prêmio do mês</th>
+            <th class="num">%</th>
+            <th class="num">Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in todas %}
+            <tr>
+              <td>{{ c.competencia }}</td>
+              <td>{{ c.papel|capitalize }}</td>
+              <td>{{ c.quem }}</td>
+              <td class="num">{{ reais(c.premio_total) }}</td>
+              <td class="num">{{ c.percentual|int }}%</td>
+              <td class="num">{{ reais(c.valor) }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+{% endblock %}

@@ -1,0 +1,108 @@
+{# ==================================================================
+   inadimplencia.html — Inadimplencia
+   ==================================================================
+   ATENCAO: a SEGURADORA nao tem acesso a esta tela (regra do projeto).
+   ================================================================== #}
+{% extends "base.html" %}
+
+{% block titulo %}Inadimplência — Central de Seguros{% endblock %}
+{% block cabecalho %}Inadimplência{% endblock %}
+{% block subcabecalho %}Participantes em atraso e régua de cobrança{% endblock %}
+
+{% block conteudo %}
+
+  {# ---------- OS 4 NUMEROS ---------- #}
+  <div class="kpis">
+    <div class="kpi">
+      <div class="lbl">Valor total em atraso</div>
+      <div class="val" style="font-size:24px">{{ reais(kpis.total, 2) }}</div>
+      <div class="delta">soma de todos os atrasos</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Participantes inadimplentes</div>
+      <div class="val">{{ kpis.quantidade }}</div>
+      <div class="delta warn">● requer cobrança</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Em risco de cancelamento</div>
+      <div class="val">{{ kpis.em_risco }}</div>
+      <div class="delta down">+90 dias em atraso</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Maior atraso</div>
+      <div class="val">{{ kpis.maior_atraso }} <span style="font-size:15px">dias</span></div>
+      <div class="delta down">{{ kpis.maior_nome }}</div>
+    </div>
+  </div>
+
+  {# ---------- REGUA DE COBRANCA ---------- #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Régua de cobrança</h3>
+        <p>Ação recomendada conforme o tempo de atraso <span class="ia-tag">✦ automático</span></p>
+      </div>
+    </div>
+    <div class="ruler">
+      {% for degrau in regua %}
+        <div class="rstep r{{ loop.index }}">
+          <div class="rd">{{ degrau.faixa }}</div>
+          <div class="rn">{{ degrau.quantidade }}</div>
+          <div class="rt">{{ degrau.acao }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ---------- LISTA DE INADIMPLENTES ---------- #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Participantes inadimplentes</h3>
+        <p>Ordenados por dias em atraso — os mais críticos primeiro</p>
+      </div>
+      <a class="exp-btn" href="/inadimplencia/exportar" download>⬇ Exportar Excel</a>
+    </div>
+
+    <div class="tabela-rolagem">
+      <table>
+        <thead>
+          <tr>
+            <th>Participante</th>
+            <th>Apólice</th>
+            <th>Cobertura</th>
+            <th class="num">Valor</th>
+            <th class="num">Dias atraso</th>
+            <th>Faixa</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in inadimplentes %}
+            <tr>
+              <td>{{ d.participante }}</td>
+              <td>{{ d.numero_apolice }}</td>
+              <td>{{ d.cobertura }}</td>
+              <td class="num">{{ reais(d.valor, 2) }}</td>
+              <td class="num">{{ d.dias_atraso }}</td>
+              <td><span class="pill {{ d.cor_da_faixa() }}">{{ d.faixa() }}</span></td>
+              <td>
+                {% if d.cobranca_enviada %}
+                  <button class="act-btn" disabled>✓ Cobrança enviada</button>
+                {% else %}
+                  {# POST porque a acao grava no banco #}
+                  <form method="post" action="/inadimplencia/cobrar/{{ d.id }}">
+                    <button type="submit" class="act-btn">Cobrar</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7" class="vazio">Nenhum participante inadimplente. 🎉</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+{% endblock %}

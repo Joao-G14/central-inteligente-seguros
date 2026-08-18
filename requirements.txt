@@ -1,0 +1,13 @@
+# Bibliotecas necessarias para rodar o projeto.
+# Para instalar tudo de uma vez:  pip install -r requirements.txt
+
+fastapi==0.141.1          # o framework web (cria as rotas/paginas)
+uvicorn==0.52.3           # o servidor que coloca o site no ar
+jinja2==3.1.6             # monta as paginas HTML com dados dinamicos
+sqlalchemy==2.0.52        # conversa com o banco de dados SQLite
+bcrypt==5.0.0             # transforma a senha em hash (nunca texto puro)
+itsdangerous==2.2.0       # assina o cookie de sessao do login
+python-multipart==0.0.32  # le os campos do formulario de login
+
+# --- so para rodar os testes ---
+httpx2==2.12.0            # simula um navegador em tests/test_login.py

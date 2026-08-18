@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Central Inteligente de Seguros — Sebrae Previdência</title>
+<style>
+  :root{
+    --navy:#0E2A6B; --blue:#1F3B8C; --blue2:#2E75B6; --sky:#3B8FD4;
+    --bg:#EEF2F8; --card:#FFFFFF; --ink:#1B2437; --muted:#6B7691;
+    --line:#E2E8F2; --green:#1E9E5B; --amber:#D9930A; --red:#D64545;
+    --shadow:0 1px 3px rgba(16,42,107,.08),0 8px 24px rgba(16,42,107,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+  .app{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+
+  /* Sidebar */
+  .side{background:linear-gradient(180deg,var(--navy),var(--blue));color:#fff;padding:22px 16px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+  .brand{display:flex;align-items:center;gap:10px;padding:4px 6px 22px;border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:14px}
+  .brand .logo{width:34px;height:34px;border-radius:8px;background:#fff;display:grid;place-items:center;font-weight:800;color:var(--blue);font-size:15px;letter-spacing:-1px}
+  .brand b{font-size:15px;line-height:1.15;font-weight:700}
+  .brand span{display:block;font-size:11px;color:#B9C9EC;font-weight:500}
+  .nav{list-style:none;display:flex;flex-direction:column;gap:3px}
+  .nav li{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:9px;cursor:pointer;color:#D3DEF6;font-size:14px;font-weight:500;transition:.15s}
+  .nav li svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9}
+  .nav li:hover{background:rgba(255,255,255,.08);color:#fff}
+  .nav li.active{background:#fff;color:var(--blue);font-weight:600;box-shadow:var(--shadow)}
+  .side-foot{margin-top:auto;font-size:11px;color:#9FB4E0;padding:12px 8px 0;border-top:1px solid rgba(255,255,255,.12)}
+  .badge-mvp{display:inline-block;background:rgba(255,255,255,.14);color:#DCE7FB;font-size:10px;padding:3px 8px;border-radius:20px;margin-top:8px;font-weight:600;letter-spacing:.3px}
+
+  /* Topbar */
+  .main{display:flex;flex-direction:column;min-width:0}
+  .top{background:var(--card);border-bottom:1px solid var(--line);padding:16px 30px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:5}
+  .top h1{font-size:19px;font-weight:700}
+  .top .sub{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .top .who{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+  .avatar{width:34px;height:34px;border-radius:50%;background:var(--blue2);color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px}
+
+  .content{padding:26px 30px;overflow:auto}
+  .view{display:none;animation:fade .25s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* Cards / KPIs */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:22px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow)}
+  .kpi .lbl{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+  .kpi .val{font-size:28px;font-weight:800;margin-top:8px;color:var(--blue)}
+  .kpi .delta{font-size:12px;margin-top:6px;font-weight:600}
+  .kpi .delta.up{color:var(--green)} .kpi .delta.down{color:var(--red)} .kpi .delta.warn{color:var(--amber)}
+
+  .grid2{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:var(--shadow);margin-bottom:18px}
+  .panel h3{font-size:15px;font-weight:700;margin-bottom:4px}
+  .panel .ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+  .panel .ph p{font-size:12px;color:var(--muted)}
+
+  /* Bar chart */
+  .bars{display:flex;align-items:flex-end;gap:14px;height:180px;padding-top:10px}
+  .bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%}
+  .bar-col{width:100%;display:flex;flex-direction:column;justify-content:flex-end;height:100%}
+  .bar{width:100%;border-radius:7px 7px 0 0;background:linear-gradient(180deg,var(--sky),var(--blue2));transition:.4s}
+  .bar-lbl{font-size:11px;color:var(--muted);font-weight:600}
+
+  /* Donut legend */
+  .donut-wrap{display:flex;align-items:center;gap:20px}
+  .legend{list-style:none;display:flex;flex-direction:column;gap:10px;font-size:13px}
+  .legend li{display:flex;align-items:center;gap:9px;color:var(--ink)}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .legend .n{margin-left:auto;font-weight:700;color:var(--blue)}
+
+  /* Table */
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;padding:10px 12px;border-bottom:2px solid var(--line)}
+  td{padding:12px;border-bottom:1px solid var(--line);color:var(--ink)}
+  tr:hover td{background:#F7FAFE}
+  .pill{font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:20px;display:inline-block}
+  .pill.ok{background:#E4F6EC;color:var(--green)}
+  .pill.warn{background:#FCF2DD;color:var(--amber)}
+  .pill.late{background:#FBE6E6;color:var(--red)}
+  .pill.blue{background:#E7F0FB;color:var(--blue2)}
+
+  .search{border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-size:13px;width:240px;outline:none}
+  .search:focus{border-color:var(--blue2)}
+
+  /* Assistant */
+  .assist{display:grid;grid-template-columns:1fr;gap:0;max-width:900px;margin:0 auto}
+  .chat{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;height:calc(100vh - 210px);min-height:460px}
+  .chat-head{background:linear-gradient(90deg,var(--navy),var(--blue2));color:#fff;padding:16px 20px;display:flex;align-items:center;gap:12px}
+  .chat-head .ai{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.16);display:grid;place-items:center;font-size:18px}
+  .chat-head b{font-size:15px} .chat-head span{font-size:12px;color:#CBD9F4;display:block}
+  .msgs{flex:1;overflow:auto;padding:22px;display:flex;flex-direction:column;gap:14px;background:#F7FAFE}
+  .msg{max-width:82%;padding:13px 16px;border-radius:14px;font-size:14px;line-height:1.5}
+  .msg.bot{background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px;align-self:flex-start;box-shadow:var(--shadow)}
+  .msg.me{background:var(--blue);color:#fff;border-bottom-right-radius:4px;align-self:flex-end}
+  .msg.bot b{color:var(--blue)}
+  .msg table{margin-top:8px;font-size:12.5px}
+  .msg table td,.msg table th{padding:7px 9px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;padding:12px 18px;border-top:1px solid var(--line);background:#fff}
+  .chip{font-size:12.5px;background:#EEF3FB;color:var(--blue);border:1px solid #DBE6F6;padding:8px 13px;border-radius:20px;cursor:pointer;transition:.15s;font-weight:500}
+  .chip:hover{background:var(--blue);color:#fff}
+  .composer{display:flex;gap:10px;padding:14px 18px;border-top:1px solid var(--line);background:#fff}
+  .composer input{flex:1;border:1px solid var(--line);border-radius:24px;padding:12px 18px;font-size:14px;outline:none}
+  .composer input:focus{border-color:var(--blue2)}
+  .composer button{background:var(--blue);color:#fff;border:none;border-radius:24px;padding:0 22px;font-weight:600;cursor:pointer;font-size:14px}
+  .composer button:hover{background:var(--navy)}
+  .typing{display:flex;gap:4px;padding:14px 16px}
+  .typing span{width:7px;height:7px;border-radius:50%;background:var(--blue2);animation:blink 1.2s infinite}
+  .typing span:nth-child(2){animation-delay:.2s} .typing span:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,60%,100%{opacity:.3}30%{opacity:1}}
+
+  .demo-note{background:#FFF8E8;border:1px solid #F0DCA8;color:#8A6B14;font-size:12px;padding:8px 14px;border-radius:8px;margin-bottom:18px;display:flex;gap:8px;align-items:center}
+
+  /* Esteira / kanban */
+  .board{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .col{background:#F3F6FB;border:1px solid var(--line);border-radius:14px;padding:12px;min-height:200px}
+  .col-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:2px 4px}
+  .col-h b{font-size:13px}
+  .col-h .cnt{font-size:11px;font-weight:700;background:#fff;border:1px solid var(--line);border-radius:20px;padding:2px 9px;color:var(--muted)}
+  .col.c-prop b{color:var(--muted)} .col.c-ana b{color:var(--blue2)} .col.c-ok b{color:var(--green)} .col.c-pend b{color:var(--amber)}
+  .card-mini{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(16,42,107,.05);border-left:3px solid var(--blue2)}
+  .card-mini.ok{border-left-color:var(--green)} .card-mini.pend{border-left-color:var(--amber)} .card-mini.rec{border-left-color:var(--red)}
+  .card-mini .ap{font-size:12.5px;font-weight:700;color:var(--blue)}
+  .card-mini .nm{font-size:13px;margin:3px 0}
+  .card-mini .mt{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;margin-top:6px}
+
+  /* Upload */
+  .drop{border:2px dashed #B9CBE8;border-radius:14px;padding:34px;text-align:center;background:#F7FAFE;cursor:pointer;transition:.15s}
+  .drop:hover{border-color:var(--blue2);background:#EEF4FC}
+  .drop .ic{font-size:34px} .drop b{display:block;margin:8px 0 4px;color:var(--blue);font-size:15px}
+  .drop p{font-size:12.5px;color:var(--muted)}
+  .steps{display:flex;gap:8px;margin:16px 0;flex-wrap:wrap}
+  .step{flex:1;min-width:130px;background:#F3F6FB;border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:12.5px;color:var(--muted)}
+  .step.done{background:#E4F6EC;border-color:#BFE6CE;color:var(--green);font-weight:600}
+  .step .s-n{font-size:10px;text-transform:uppercase;letter-spacing:.5px;display:block;opacity:.8}
+
+  /* Comissões */
+  .comm-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:18px}
+  .comm{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow);border-top:4px solid var(--blue)}
+  .comm.corr{border-top-color:var(--blue2)} .comm.seg{border-top-color:var(--green)}
+  .comm .role{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+  .comm .who2{font-size:14px;font-weight:600;margin:2px 0 12px}
+  .comm .amt{font-size:24px;font-weight:800;color:var(--blue)}
+  .comm .pct{font-size:12px;color:var(--muted);margin-top:4px}
+  .comm .prog{height:7px;background:#EEF2F8;border-radius:20px;margin-top:12px;overflow:hidden}
+  .comm .prog i{display:block;height:100%;border-radius:20px;background:var(--blue)}
+  .comm.corr .prog i{background:var(--blue2)} .comm.seg .prog i{background:var(--green)}
+
+  /* Emissão de boletos por convênio */
+  .compbar{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+  .compbar label{font-size:12.5px;color:var(--muted);font-weight:600}
+  .compbar select{border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-size:13px;outline:none;background:#fff;color:var(--ink);cursor:pointer}
+  .compbar select:focus{border-color:var(--blue2)}
+  .conv-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .conv{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow);border-top:4px solid var(--blue)}
+  .conv h4{font-size:15px;color:var(--blue);margin-bottom:2px}
+  .conv .cd{font-size:11px;color:var(--muted);margin-bottom:12px}
+  .conv .row{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;border-bottom:1px dashed var(--line)}
+  .conv .row span:last-child{font-weight:700;color:var(--ink)}
+  .conv .tot{display:flex;justify-content:space-between;margin:10px 0 12px;font-size:14px}
+  .conv .tot b{color:var(--blue)}
+  .conv button{width:100%;background:var(--blue);color:#fff;border:none;border-radius:9px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+  .conv button:hover{background:var(--navy)}
+  .conv button:disabled{background:var(--green);cursor:default}
+
+  /* Selo IA */
+  .ia-tag{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;background:#EDE7FB;color:#5B3BC4;padding:3px 8px;border-radius:20px;vertical-align:middle}
+  /* Antes x depois */
+  .ba-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;align-items:center}
+  .ba{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;text-align:center;box-shadow:var(--shadow)}
+  .ba.before{opacity:.85} .ba.after{border:2px solid var(--green)}
+  .ba .t{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700}
+  .ba .big{font-size:34px;font-weight:800;margin:8px 0 2px}
+  .ba.before .big{color:var(--red)} .ba.after .big{color:var(--green)}
+  .ba .u{font-size:12px;color:var(--muted)}
+  .ba-arrow{font-size:26px;color:var(--blue2)}
+  .ba-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:16px}
+  .ba-mini{background:#F7FAFE;border:1px solid var(--line);border-radius:10px;padding:14px;text-align:center}
+  .ba-mini .m1{font-size:12px;color:var(--muted)} .ba-mini .m2{font-size:18px;font-weight:800;color:var(--green);margin-top:4px}
+  /* Sino de alertas */
+  .bell{position:relative;cursor:pointer;font-size:19px;padding:4px}
+  .bell .cnt{position:absolute;top:-2px;right:-4px;background:var(--red);color:#fff;font-size:9px;font-weight:700;width:15px;height:15px;border-radius:50%;display:grid;place-items:center}
+  .alerts-pop{position:absolute;top:56px;right:24px;width:320px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(16,42,107,.18);z-index:20;overflow:hidden;display:none}
+  .alerts-pop.show{display:block}
+  .alerts-pop h4{font-size:13px;padding:13px 16px;background:var(--blue);color:#fff}
+  .alerts-pop .ai{display:flex;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line);font-size:12.5px;align-items:flex-start}
+  .alerts-pop .ai .ic{font-size:15px} .alerts-pop .ai:last-child{border:none}
+  .alerts-pop .ai b{color:var(--blue)}
+  /* Botão exportar */
+  .exp-btn{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;background:#E4F6EC;color:var(--green);border:1px solid #BFE6CE;padding:8px 13px;border-radius:9px;cursor:pointer;transition:.15s}
+  .exp-btn:hover{background:var(--green);color:#fff}
+  /* Perfil */
+  .perfil-sel{border:1px solid var(--line);border-radius:9px;padding:8px 11px;font-size:12.5px;background:#fff;color:var(--ink);cursor:pointer;outline:none;font-weight:600}
+  .perfil-sel:focus{border-color:var(--blue2)}
+  .hide-perfil{display:none!important}
+  /* Anexos */
+  .doc-chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;background:#EEF3FB;color:var(--blue);border:1px solid #DBE6F6;padding:4px 9px;border-radius:7px;cursor:pointer;text-decoration:none}
+  .doc-chip:hover{background:var(--blue);color:#fff}
+  .doc-chip.miss{background:#FBE6E6;color:var(--red);border-color:#F0C4C4}
+
+  /* Seletor de ramo */
+  .ramo-sel{border:1px solid var(--line);border-radius:9px;padding:8px 11px;font-size:12.5px;background:#fff;color:var(--ink);cursor:pointer;outline:none;font-weight:600}
+  .ramo-sel:focus{border-color:var(--blue2)}
+  /* Catálogo de produtos */
+  .prod-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .prod{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:var(--shadow);position:relative;transition:.15s}
+  .prod.active{border:2px solid var(--green)}
+  .prod.soon{opacity:.72}
+  .prod .picon{width:48px;height:48px;border-radius:12px;display:grid;place-items:center;font-size:24px;background:#EEF3FB;margin-bottom:14px}
+  .prod.active .picon{background:#E4F6EC}
+  .prod h4{font-size:16px;color:var(--blue);margin-bottom:4px}
+  .prod p{font-size:12.5px;color:var(--muted);line-height:1.5}
+  .prod .stat{position:absolute;top:18px;right:18px;font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:20px}
+  .prod.active .stat{background:#E4F6EC;color:var(--green)}
+  .prod.soon .stat{background:#F0F2F6;color:var(--muted)}
+  .prod .metrics{display:flex;gap:16px;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+  .prod .metrics div{font-size:11px;color:var(--muted)}
+  .prod .metrics b{display:block;font-size:16px;color:var(--blue);font-weight:800}
+  .engine-note{display:flex;align-items:center;gap:12px;background:linear-gradient(90deg,#EDE7FB,#F5F2FE);border:1px solid #D9CEF5;border-radius:14px;padding:16px 20px;margin-bottom:18px}
+  .engine-note .en-ic{font-size:26px}
+  .engine-note b{color:#5B3BC4} .engine-note p{font-size:12.5px;color:#4A3A6E;margin-top:2px}
+
+  /* Integrações via API */
+  .api-flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:10px;align-items:center;margin:8px 0 4px}
+  .api-node{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;text-align:center;box-shadow:var(--shadow)}
+  .api-node.hub{background:var(--navy);border:none}
+  .api-node .ni{font-size:26px} .api-node h4{font-size:14px;color:var(--blue);margin:6px 0 2px}
+  .api-node.hub h4{color:#fff} .api-node p{font-size:11px;color:var(--muted)} .api-node.hub p{color:#9EC0E8}
+  .api-arrow{font-size:20px;color:var(--blue2);text-align:center}
+  .api-arrow small{display:block;font-size:9px;color:var(--muted)}
+  .conn-list{margin-top:4px}
+  .conn{display:flex;align-items:center;gap:14px;padding:14px 4px;border-bottom:1px solid var(--line)}
+  .conn:last-child{border:none}
+  .conn .cic{width:42px;height:42px;border-radius:11px;background:#EEF3FB;display:grid;place-items:center;font-size:20px;flex-shrink:0}
+  .conn .cinfo{flex:1}
+  .conn .cinfo b{font-size:14px;color:var(--blue)} .conn .cinfo p{font-size:12px;color:var(--muted)}
+  .conn .cstatus{font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:20px}
+  .conn .cstatus.on{background:#E4F6EC;color:var(--green)}
+  .conn .cstatus.plan{background:#FCF2DD;color:var(--amber)}
+  .conn .cstatus.dev{background:#E7F0FB;color:var(--blue2)}
+
+  /* Inadimplência — régua de cobrança */
+  .ruler{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:6px}
+  .rstep{border-radius:12px;padding:15px;color:#fff}
+  .rstep.r1{background:linear-gradient(135deg,#3B8FD4,#2E75B6)}
+  .rstep.r2{background:linear-gradient(135deg,#D9930A,#C07E00)}
+  .rstep.r3{background:linear-gradient(135deg,#E06A2A,#C4551A)}
+  .rstep.r4{background:linear-gradient(135deg,#D64545,#B32E2E)}
+  .rstep .rd{font-size:11px;text-transform:uppercase;letter-spacing:.5px;opacity:.9}
+  .rstep .rn{font-size:26px;font-weight:800;margin:4px 0}
+  .rstep .rt{font-size:12px;opacity:.95}
+  .act-btn{font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:7px;border:1px solid var(--blue2);background:#fff;color:var(--blue2);cursor:pointer;transition:.15s}
+  .act-btn:hover{background:var(--blue2);color:#fff}
+
+  @media(max-width:920px){
+    .app{grid-template-columns:1fr}
+    .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center}
+    .brand{border:none;margin:0;padding:0 12px 0 0}
+    .nav{flex-direction:row;flex-wrap:wrap} .side-foot{display:none}
+    .kpis{grid-template-columns:repeat(2,1fr)} .grid2{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">SP</div>
+      <div><b>Central de Seguros</b><span>Sebrae Previdência</span></div>
+    </div>
+    <ul class="nav">
+      <li class="active" data-view="dash">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Dashboard</li>
+      <li data-view="produtos">
+        <svg viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4"/></svg>Ramos / Produtos</li>
+      <li data-view="integracoes">
+        <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>Integrações (API)</li>
+      <li data-view="seguros">
+        <svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/></svg>Gestão de Seguros</li>
+      <li data-view="esteira">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="4" height="16"/><rect x="10" y="4" width="4" height="10"/><rect x="17" y="4" width="4" height="13"/></svg>Esteira de Apólices</li>
+      <li data-view="movimentacao">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Movimentação & Pgto.</li>
+      <li data-view="comissoes">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Painel de Comissões</li>
+      <li data-view="inadimplencia">
+        <svg viewBox="0 0 24 24"><path d="M1 4h22v16H1z"/><line x1="1" y1="10" x2="23" y2="10"/><line x1="5" y1="15" x2="9" y2="15"/></svg>Inadimplência</li>
+      <li data-view="sinistros">
+        <svg viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17"/></svg>Sinistros</li>
+      <li data-view="pendencias">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>Pendências</li>
+      <li data-view="assist">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Assistente IA ★</li>
+    </ul>
+    <div class="side-foot">
+      Programa Prev IA · 1º Ciclo
+      <span class="badge-mvp">PROTÓTIPO — DADOS FICTÍCIOS</span>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="top">
+      <div>
+        <h1 id="viewTitle">Dashboard da Carteira</h1>
+        <div class="sub" id="viewSub">Visão geral dos seguros de risco — morte e invalidez</div>
+      </div>
+      <div class="who">
+        <select class="ramo-sel" id="ramoSel" title="Ramo de seguro">
+          <option value="risco">Ramo: Morte/Invalidez ✓</option>
+          <option value="auto" disabled>Auto (em breve)</option>
+          <option value="viagem" disabled>Viagem (em breve)</option>
+          <option value="bike" disabled>Bike (em breve)</option>
+          <option value="residencial" disabled>Residencial (em breve)</option>
+        </select>
+        <select class="perfil-sel" id="perfilSel" onchange="mudaPerfil()" title="Perfil de acesso">
+          <option value="estipulante">👁 Estipulante (Sebrae Prev)</option>
+          <option value="corretora">🤝 Corretora</option>
+          <option value="seguradora">🛡 Seguradora (ICATU)</option>
+        </select>
+        <div class="bell" onclick="toggleAlerts()">🔔<span class="cnt">3</span></div>
+        <span id="whoName">Luciana Cristina</span>
+        <div class="avatar" id="whoAv">LC</div>
+      </div>
+      <div class="alerts-pop" id="alertsPop">
+        <h4>🔔 Alertas inteligentes <span class="ia-tag" style="background:rgba(255,255,255,.2);color:#fff">IA</span></h4>
+        <div class="ai"><span class="ic">⏰</span><div><b>3 renovações</b> vencem esta semana. A mais urgente: AP-2041 (Marcos Ribeiro), em 7 dias.</div></div>
+        <div class="ai"><span class="ic">💰</span><div>Boleto <b>OPBB (06/2026)</b> ainda em aberto — vencimento 10/07.</div></div>
+        <div class="ai"><span class="ic">⚠️</span><div><b>3 participantes</b> em risco de cancelamento por inadimplência (+90 dias).</div></div>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- RAMOS / PRODUTOS -->
+      <section class="view" id="produtos">
+        <div class="engine-note">
+          <div class="en-ic">⚙️</div>
+          <div><b>Motor único, vários ramos.</b><p>O mesmo fluxo de esteira, movimentação, comissão, inadimplência e o assistente de IA atende qualquer ramo. Adicionar um novo produto é configuração — não recomeçar do zero.</p></div>
+        </div>
+        <div class="panel">
+          <div class="ph"><div><h3>Catálogo de ramos</h3><p>Risco em operação hoje · demais ramos no roadmap de expansão</p></div></div>
+          <div class="prod-grid">
+            <div class="prod active">
+              <div class="stat">● Ativo</div>
+              <div class="picon">🛡️</div>
+              <h4>Morte e Invalidez</h4>
+              <p>Seguro de risco — cobertura por falecimento e invalidez. Em plena operação.</p>
+              <div class="metrics"><div><b>1.284</b>apólices</div><div><b>3.910</b>vidas</div><div><b>R$ 812M</b>capital</div></div>
+            </div>
+            <div class="prod soon">
+              <div class="stat">Em breve</div>
+              <div class="picon">🚗</div>
+              <h4>Auto</h4>
+              <p>Seguro de veículos — casco, terceiros e assistência 24h. Mesmo motor de esteira e cobrança.</p>
+              <div class="metrics"><div><b>Fase 2</b>roadmap</div><div><b>—</b></div><div><b>—</b></div></div>
+            </div>
+            <div class="prod soon">
+              <div class="stat">Em breve</div>
+              <div class="picon">✈️</div>
+              <h4>Viagem</h4>
+              <p>Assistência e seguro viagem nacional e internacional, com emissão rápida de bilhete.</p>
+              <div class="metrics"><div><b>Fase 2</b>roadmap</div><div><b>—</b></div><div><b>—</b></div></div>
+            </div>
+            <div class="prod soon">
+              <div class="stat">Em breve</div>
+              <div class="picon">🚲</div>
+              <h4>Bike</h4>
+              <p>Seguro para bicicletas — roubo, furto, danos e responsabilidade civil.</p>
+              <div class="metrics"><div><b>Fase 3</b>roadmap</div><div><b>—</b></div><div><b>—</b></div></div>
+            </div>
+            <div class="prod soon">
+              <div class="stat">Em breve</div>
+              <div class="picon">🏠</div>
+              <h4>Residencial</h4>
+              <p>Seguro residencial — incêndio, danos elétricos, roubo e assistência ao lar.</p>
+              <div class="metrics"><div><b>Fase 3</b>roadmap</div><div><b>—</b></div><div><b>—</b></div></div>
+            </div>
+            <div class="prod soon" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;border-style:dashed">
+              <div class="picon" style="background:transparent">➕</div>
+              <h4 style="color:var(--muted)">Novos ramos</h4>
+              <p>A arquitetura aceita novos produtos conforme a estratégia do Sebrae Previdência.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- INTEGRAÇÕES (API) -->
+      <section class="view" id="integracoes">
+        <div class="engine-note">
+          <div class="en-ic">🔗</div>
+          <div><b>Para onde o projeto evolui.</b><p>O protótipo mostra a experiência; a integração via API é a evolução natural — os dados passam a chegar automaticamente dos sistemas, sem digitação nem planilhas.</p></div>
+        </div>
+        <div class="panel">
+          <div class="ph"><div><h3>Como os dados vão fluir</h3><p>A Central se conecta às fontes via API e consolida tudo em um só lugar</p></div></div>
+          <div class="api-flow">
+            <div class="api-node"><div class="ni">🤝</div><h4>Corretora</h4><p>Movimentações · comissões</p></div>
+            <div class="api-arrow">➜<small>API</small></div>
+            <div class="api-node hub"><div class="ni">⚙️</div><h4>Central de Seguros</h4><p>Consolida + IA</p></div>
+            <div class="api-arrow">➜<small>API</small></div>
+            <div class="api-node"><div class="ni">🛡️</div><h4>Seguradora ICATU</h4><p>Apólices · sinistros</p></div>
+          </div>
+          <p style="text-align:center;font-size:12px;color:var(--muted);margin-top:10px">O Trust Prev e a Área do Participante também alimentam a Central pela mesma camada de integração.</p>
+        </div>
+        <div class="panel">
+          <div class="ph"><div><h3>Conexões previstas</h3><p>Status de cada integração no roadmap</p></div></div>
+          <div class="conn-list">
+            <div class="conn"><div class="cic">📥</div><div class="cinfo"><b>Envio de planilha (atual)</b><p>Base recebida da corretora, processada manualmente — funciona hoje, sem integração</p></div><span class="cstatus on">● Ativo</span></div>
+            <div class="conn"><div class="cic">🛡️</div><div class="cinfo"><b>API ICATU (seguradora)</b><p>Apólices, coberturas e sinistros sincronizados automaticamente</p></div><span class="cstatus plan">Fase 3</span></div>
+            <div class="conn"><div class="cic">🤝</div><div class="cinfo"><b>API Corretora</b><p>Movimentações, propostas e comissões em tempo real</p></div><span class="cstatus plan">Fase 3</span></div>
+            <div class="conn"><div class="cic">🗄️</div><div class="cinfo"><b>Trust Prev</b><p>Dados cadastrais e de plano dos participantes</p></div><span class="cstatus plan">Fase 3</span></div>
+            <div class="conn"><div class="cic">👤</div><div class="cinfo"><b>Área do Participante</b><p>Autoatendimento e consulta pelo próprio participante</p></div><span class="cstatus dev">Fase 4</span></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="ph"><div><h3>Pré-requisitos da integração</h3><p>O que precisa ser validado antes de conectar (governança)</p></div></div>
+          <table>
+            <thead><tr><th>Etapa</th><th>O que envolve</th></tr></thead>
+            <tbody>
+              <tr><td>Credenciais de acesso</td><td>Chaves/API keys autorizadas por cada sistema (ICATU, corretora, Trust Prev)</td></tr>
+              <tr><td>Homologação de segurança</td><td>Validação da Segurança da Informação e aderência à LGPD</td></tr>
+              <tr><td>Mapeamento de dados</td><td>De/para entre os campos de cada sistema e a Central</td></tr>
+              <tr><td>Ambiente homologado</td><td>Tráfego e armazenamento apenas no ambiente corporativo aprovado</td></tr>
+              <tr><td>Validação da área</td><td>Manifestação favorável da área responsável pelo processo</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- DASHBOARD -->
+      <section class="view active" id="dash">
+        <div class="panel" style="background:linear-gradient(90deg,#F4F8FD,#fff)">
+          <div class="ph"><div><h3>Impacto da Central Inteligente <span class="ia-tag">✦ com IA</span></h3><p>Ganho estimado após a adoção da solução</p></div></div>
+          <div class="ba-grid">
+            <div class="ba before"><div class="t">Antes</div><div class="big">2h</div><div class="u">para consolidar e responder uma consulta da carteira</div></div>
+            <div class="ba-arrow">➜</div>
+            <div class="ba after"><div class="t">Depois</div><div class="big">30s</div><div class="u">consulta em linguagem natural ao assistente de IA</div></div>
+          </div>
+          <div class="ba-row">
+            <div class="ba-mini"><div class="m1">Tempo de análise de sinistro</div><div class="m2">11,4d → 6,2d</div></div>
+            <div class="ba-mini"><div class="m1">Inadimplência recuperada</div><div class="m2">+ R$ 5.120/mês</div></div>
+            <div class="ba-mini"><div class="m1">Perda de prazos de renovação</div><div class="m2">Quase zero</div></div>
+          </div>
+        </div>
+        <div class="kpis">
+          <div class="kpi"><div class="lbl">Apólices ativas</div><div class="val">1.284</div><div class="delta up">▲ 3,2% no mês</div></div>
+          <div class="kpi"><div class="lbl">Vidas cobertas</div><div class="val">3.910</div><div class="delta up">▲ 1,8% no mês</div></div>
+          <div class="kpi"><div class="lbl">Renovações em 30 dias</div><div class="val">47</div><div class="delta warn">● requer ação</div></div>
+          <div class="kpi"><div class="lbl">Pendências abertas</div><div class="val">12</div><div class="delta down">▼ 4 vs. semana</div></div>
+        </div>
+        <div class="grid2">
+          <div class="panel">
+            <div class="ph"><div><h3>Capital segurado por mês</h3><p>Morte e invalidez — R$ milhões</p></div></div>
+            <div class="bars">
+              <div class="bar-wrap"><div class="bar-col"><div class="bar" style="height:58%"></div></div><div class="bar-lbl">Mar</div></div>
+              <div class="bar-wrap"><div class="bar-col"><div class="bar" style="height:64%"></div></div><div class="bar-lbl">Abr</div></div>
+              <div class="bar-wrap"><div class="bar-col"><div class="bar" style="height:71%"></div></div><div class="bar-lbl">Mai</div></div>
+              <div class="bar-wrap"><div class="bar-col"><div class="bar" style="height:66%"></div></div><div class="bar-lbl">Jun</div></div>
+              <div class="bar-wrap"><div class="bar-col"><div class="bar" style="height:83%"></div></div><div class="bar-lbl">Jul</div></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="ph"><div><h3>Distribuição por cobertura</h3><p>Carteira atual</p></div></div>
+            <div class="donut-wrap">
+              <svg width="150" height="150" viewBox="0 0 42 42">
+                <circle cx="21" cy="21" r="15.9" fill="none" stroke="#EEF2F8" stroke-width="7"/>
+                <circle cx="21" cy="21" r="15.9" fill="none" stroke="#1F3B8C" stroke-width="7" stroke-dasharray="63 37" stroke-dashoffset="25"/>
+                <circle cx="21" cy="21" r="15.9" fill="none" stroke="#3B8FD4" stroke-width="7" stroke-dasharray="37 63" stroke-dashoffset="62"/>
+              </svg>
+              <ul class="legend">
+                <li><span class="dot" style="background:#1F3B8C"></span>Morte <span class="n">63%</span></li>
+                <li><span class="dot" style="background:#3B8FD4"></span>Invalidez <span class="n">37%</span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="ph"><div><h3>Próximas renovações</h3><p>Ordenadas por vencimento</p></div></div>
+          <table>
+            <thead><tr><th>Apólice</th><th>Participante</th><th>Cobertura</th><th>Vencimento</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>AP-2041</td><td>Marcos A. Ribeiro</td><td>Morte + Invalidez</td><td>28/07/2026</td><td><span class="pill late">Vence em 7 dias</span></td></tr>
+              <tr><td>AP-1987</td><td>Fernanda C. Lima</td><td>Morte</td><td>03/08/2026</td><td><span class="pill warn">Vence em 13 dias</span></td></tr>
+              <tr><td>AP-2115</td><td>João P. Andrade</td><td>Invalidez</td><td>11/08/2026</td><td><span class="pill warn">Vence em 21 dias</span></td></tr>
+              <tr><td>AP-2033</td><td>Cláudia M. Souza</td><td>Morte + Invalidez</td><td>19/08/2026</td><td><span class="pill blue">Em dia</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- GESTÃO DE SEGUROS -->
+      <section class="view" id="seguros">
+        <div class="panel">
+          <div class="ph">
+            <div><h3>Carteira de apólices</h3><p>1.284 apólices ativas — amostra</p></div>
+            <input class="search" placeholder="Buscar participante ou apólice…" oninput="filterTable(this,'tblSeg')">
+          </div>
+          <table id="tblSeg">
+            <thead><tr><th>Apólice</th><th>Participante</th><th>Cobertura</th><th>Capital segurado</th><th>Início</th><th>Vencimento</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>AP-2041</td><td>Marcos A. Ribeiro</td><td>Morte + Invalidez</td><td>R$ 250.000</td><td>28/07/2025</td><td>28/07/2026</td><td><span class="pill late">A renovar</span></td></tr>
+              <tr><td>AP-1987</td><td>Fernanda C. Lima</td><td>Morte</td><td>R$ 180.000</td><td>03/08/2025</td><td>03/08/2026</td><td><span class="pill warn">A renovar</span></td></tr>
+              <tr><td>AP-2115</td><td>João P. Andrade</td><td>Invalidez</td><td>R$ 120.000</td><td>11/08/2024</td><td>11/08/2026</td><td><span class="pill warn">A renovar</span></td></tr>
+              <tr><td>AP-2033</td><td>Cláudia M. Souza</td><td>Morte + Invalidez</td><td>R$ 300.000</td><td>19/08/2025</td><td>19/08/2026</td><td><span class="pill ok">Ativa</span></td></tr>
+              <tr><td>AP-1954</td><td>Roberto Nunes</td><td>Morte</td><td>R$ 200.000</td><td>05/02/2026</td><td>05/02/2027</td><td><span class="pill ok">Ativa</span></td></tr>
+              <tr><td>AP-2087</td><td>Patrícia Gomes</td><td>Morte + Invalidez</td><td>R$ 350.000</td><td>22/03/2026</td><td>22/03/2027</td><td><span class="pill ok">Ativa</span></td></tr>
+              <tr><td>AP-2160</td><td>Eduardo Tavares</td><td>Morte</td><td>R$ 150.000</td><td>14/06/2026</td><td>14/06/2027</td><td><span class="pill ok">Ativa</span></td></tr>
+              <tr><td>AP-1899</td><td>Sônia R. Batista</td><td>Invalidez</td><td>R$ 100.000</td><td>30/07/2025</td><td>30/07/2026</td><td><span class="pill late">A renovar</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ESTEIRA DE APÓLICES -->
+      <section class="view" id="esteira">
+        <div class="panel">
+          <div class="ph"><div><h3>Esteira de aceitação de apólices</h3><p>Fluxo de subscrição: proposta → análise → decisão</p></div></div>
+          <div class="board">
+            <div class="col c-prop">
+              <div class="col-h"><b>Proposta recebida</b><span class="cnt">3</span></div>
+              <div class="card-mini"><div class="ap">PROP-3012</div><div class="nm">Ricardo Alves</div><div class="mt"><span>Morte + Invalidez</span><span>R$ 220 mil</span></div></div>
+              <div class="card-mini"><div class="ap">PROP-3015</div><div class="nm">Juliana Reis</div><div class="mt"><span>Morte</span><span>R$ 150 mil</span></div></div>
+              <div class="card-mini"><div class="ap">PROP-3018</div><div class="nm">Carlos Menezes</div><div class="mt"><span>Invalidez</span><span>R$ 120 mil</span></div></div>
+            </div>
+            <div class="col c-ana">
+              <div class="col-h"><b>Em análise (subscrição)</b><span class="cnt">2</span></div>
+              <div class="card-mini"><div class="ap">PROP-3008</div><div class="nm">Amanda Prado</div><div class="mt"><span>Invalidez</span><span>DPS em avaliação</span></div></div>
+              <div class="card-mini"><div class="ap">PROP-3010</div><div class="nm">Bruno Carvalho</div><div class="mt"><span>Morte + Invalidez</span><span>Aguardando análise</span></div></div>
+            </div>
+            <div class="col c-ok">
+              <div class="col-h"><b>Aceita ✅</b><span class="cnt">2</span></div>
+              <div class="card-mini ok"><div class="ap">PROP-2998</div><div class="nm">Teresa Lopes</div><div class="mt"><span>Morte</span><span>Emitir apólice</span></div></div>
+              <div class="card-mini ok"><div class="ap">PROP-3001</div><div class="nm">Felipe Duarte</div><div class="mt"><span>Morte + Invalidez</span><span>Emitir apólice</span></div></div>
+            </div>
+            <div class="col c-pend">
+              <div class="col-h"><b>Pendente ⚠️</b><span class="cnt">2</span></div>
+              <div class="card-mini pend"><div class="ap">PROP-3005</div><div class="nm">Sandra Vieira</div><div class="mt"><span>Falta DPS assinada</span></div></div>
+              <div class="card-mini rec"><div class="ap">PROP-2995</div><div class="nm">Otávio Ramos</div><div class="mt"><span>Recusada — risco agravado</span></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MOVIMENTAÇÃO & PAGAMENTO -->
+      <section class="view" id="movimentacao">
+        <div class="panel">
+          <div class="ph"><div><h3>Envio da planilha de movimentação</h3><p>Inclusões, exclusões e alterações de vidas + pagamentos</p></div></div>
+          <div class="drop" onclick="simulaUpload()">
+            <div class="ic">📤</div>
+            <b>Arraste a planilha ou clique para enviar</b>
+            <p>Formatos aceitos: .xlsx, .csv — enviado pela corretora/seguradora</p>
+          </div>
+          <div class="steps" id="upSteps" style="display:none">
+            <div class="step" id="st1"><span class="s-n">Etapa 1</span>Recebendo arquivo</div>
+            <div class="step" id="st2"><span class="s-n">Etapa 2</span>Validando dados</div>
+            <div class="step" id="st3"><span class="s-n">Etapa 3</span>Conferindo pagamentos</div>
+            <div class="step" id="st4"><span class="s-n">Etapa 4</span>Processado</div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="ph">
+            <div><h3>Movimentações do mês — competência 07/2026</h3><p>Base recebida da corretora · módulo 101 (risco morte/invalidez)</p></div>
+            <div style="display:flex;gap:10px;align-items:center">
+              <input class="search" placeholder="Buscar segurado, CPF ou matrícula…" oninput="filterTable(this,'tblMov')">
+              <button class="exp-btn" onclick="exportar('movimentacao')">⬇ Excel</button>
+            </div>
+          </div>
+          <table id="tblMov">
+            <thead><tr><th>Matrícula</th><th>Segurado</th><th>CPF</th><th>Cap. Morte</th><th>Cap. Invalidez</th><th>Prêmio</th><th>Mód/Sub</th><th>Pagamento</th></tr></thead>
+            <tbody>
+              <tr><td>100001</td><td>Ana Beatriz Souza</td><td>384.517.920-41</td><td>R$ 150.000</td><td>R$ 150.000</td><td>R$ 60,70</td><td>101 · 01</td><td><span class="pill ok">Pago</span></td></tr>
+              <tr><td>100002</td><td>Carlos Henrique Lima</td><td>617.283.945-08</td><td>R$ 200.000</td><td>R$ 200.000</td><td>R$ 81,10</td><td>101 · 01</td><td><span class="pill ok">Pago</span></td></tr>
+              <tr><td>100003</td><td>Fernanda Alves Rocha</td><td>275.619.438-70</td><td>R$ 120.000</td><td>R$ 120.000</td><td>R$ 50,10</td><td>101 · 02</td><td><span class="pill ok">Pago</span></td></tr>
+              <tr><td>100004</td><td>Gustavo Pereira Martins</td><td>948.160.372-59</td><td>R$ 250.000</td><td>R$ 250.000</td><td>R$ 102,00</td><td>101 · 02</td><td><span class="pill warn">A pagar</span></td></tr>
+              <tr><td>100005</td><td>Juliana Cristina Moraes</td><td>503.847.126-91</td><td>R$ 180.000</td><td>R$ 180.000</td><td>R$ 69,60</td><td>101 · 01</td><td><span class="pill ok">Pago</span></td></tr>
+              <tr><td>100006</td><td>Marcelo Augusto Nunes</td><td>861.395.704-22</td><td>R$ 100.000</td><td>R$ 100.000</td><td>R$ 42,30</td><td>101 · 03</td><td><span class="pill ok">Pago</span></td></tr>
+              <tr><td>100007</td><td>Patrícia Oliveira Costa</td><td>429.851.630-17</td><td>R$ 220.000</td><td>R$ 220.000</td><td>R$ 88,70</td><td>101 · 01</td><td><span class="pill late">Em atraso</span></td></tr>
+              <tr><td>100008</td><td>Ricardo Mendes Ferreira</td><td>796.214.853-64</td><td>R$ 300.000</td><td>R$ 300.000</td><td>R$ 122,00</td><td>101 · 02</td><td><span class="pill ok">Pago</span></td></tr>
+              <tr><td>100009</td><td>Simone Aparecida Lopes</td><td>154.762.398-53</td><td>R$ 160.000</td><td>R$ 160.000</td><td>R$ 64,70</td><td>101 · 03</td><td><span class="pill warn">A pagar</span></td></tr>
+              <tr><td>100010</td><td>Thiago Rodrigues Barros</td><td>682.940.517-85</td><td>R$ 140.000</td><td>R$ 140.000</td><td>R$ 56,90</td><td>101 · 01</td><td><span class="pill ok">Pago</span></td></tr>
+            </tbody>
+            <tfoot><tr style="font-weight:700;background:#F2F6FB"><td colspan="3" style="text-align:right">TOTAL (10 segurados)</td><td>R$ 1.820.000</td><td>R$ 1.820.000</td><td>R$ 738,10</td><td colspan="2"></td></tr></tfoot>
+          </table>
+        </div>
+
+        <div class="panel">
+          <div class="ph"><div><h3>Emissão de boletos por convênio</h3><p>A corretora emite os boletos segregados por convênio e competência</p></div></div>
+          <div class="compbar">
+            <label for="compSel">Mês de competência:</label>
+            <select id="compSel" onchange="mudaComp()">
+              <option value="07/2026">07/2026 — Julho</option>
+              <option value="06/2026">06/2026 — Junho</option>
+              <option value="05/2026">05/2026 — Maio</option>
+            </select>
+            <span class="pill blue" id="compTag">Competência 07/2026</span>
+          </div>
+          <div class="conv-grid">
+            <div class="conv">
+              <h4>FENACON</h4><div class="cd">Convênio · Fed. Nac. das Empresas de Serviços Contábeis</div>
+              <div class="row"><span>Vidas</span><span>1.128</span></div>
+              <div class="row"><span>Movimentações</span><span>34</span></div>
+              <div class="tot"><span>Total</span><b>R$ 74.320</b></div>
+              <button onclick="emitir(this,'FENACON')">Emitir boleto</button>
+            </div>
+            <div class="conv">
+              <h4>OPBB</h4><div class="cd">Convênio · Ordem dos Profissionais</div>
+              <div class="row"><span>Vidas</span><span>642</span></div>
+              <div class="row"><span>Movimentações</span><span>18</span></div>
+              <div class="tot"><span>Total</span><b>R$ 41.870</b></div>
+              <button onclick="emitir(this,'OPBB')">Emitir boleto</button>
+            </div>
+            <div class="conv">
+              <h4>CORECON</h4><div class="cd">Convênio · Conselho Regional de Economia</div>
+              <div class="row"><span>Vidas</span><span>489</span></div>
+              <div class="row"><span>Movimentações</span><span>11</span></div>
+              <div class="tot"><span>Total</span><b>R$ 30.510</b></div>
+              <button onclick="emitir(this,'CORECON')">Emitir boleto</button>
+            </div>
+            <div class="conv">
+              <h4>FenaSebrae</h4><div class="cd">Convênio · Federação Nacional Sebrae</div>
+              <div class="row"><span>Vidas</span><span>1.651</span></div>
+              <div class="row"><span>Movimentações</span><span>42</span></div>
+              <div class="tot"><span>Total</span><b>R$ 68.000</b></div>
+              <button onclick="emitir(this,'FenaSebrae')">Emitir boleto</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="ph"><div><h3>Boletos emitidos</h3><p>Histórico por convênio e competência</p></div></div>
+          <table id="tblBoletos">
+            <thead><tr><th>Convênio</th><th>Competência</th><th>Vidas</th><th>Valor</th><th>Vencimento</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>FenaSebrae</td><td>06/2026</td><td>1.640</td><td>R$ 67.200</td><td>10/07/2026</td><td><span class="pill ok">Pago</span></td></tr>
+              <tr><td>FENACON</td><td>06/2026</td><td>1.115</td><td>R$ 73.100</td><td>10/07/2026</td><td><span class="pill ok">Pago</span></td></tr>
+              <tr><td>OPBB</td><td>06/2026</td><td>638</td><td>R$ 41.200</td><td>10/07/2026</td><td><span class="pill warn">Em aberto</span></td></tr>
+              <tr><td>CORECON</td><td>06/2026</td><td>485</td><td>R$ 30.100</td><td>10/07/2026</td><td><span class="pill ok">Pago</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PAINEL DE COMISSÕES -->
+      <section class="view" id="comissoes">
+        <div class="panel" style="background:linear-gradient(90deg,#F4F8FD,#fff)">
+          <div class="ph"><div><h3>Comissões — competência 07/2026</h3><p>Divisão sobre o prêmio arrecadado no mês: R$ 214.700</p></div></div>
+          <div class="comm-grid">
+            <div class="comm">
+              <div class="role">Estipulante</div>
+              <div class="who2">Sebrae Previdência</div>
+              <div class="amt">R$ 21.470</div>
+              <div class="pct">10% do prêmio · repasse à Entidade</div>
+              <div class="prog"><i style="width:10%"></i></div>
+            </div>
+            <div class="comm corr">
+              <div class="role">Corretora</div>
+              <div class="who2">Corretora parceira</div>
+              <div class="amt">R$ 32.205</div>
+              <div class="pct">15% do prêmio · intermediação</div>
+              <div class="prog"><i style="width:15%"></i></div>
+            </div>
+            <div class="comm seg">
+              <div class="role">Seguradora</div>
+              <div class="who2">ICATU</div>
+              <div class="amt">R$ 161.025</div>
+              <div class="pct">75% do prêmio · risco e operação</div>
+              <div class="prog"><i style="width:75%"></i></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="ph"><div><h3>Histórico de comissões do estipulante</h3><p>Repasse mensal ao Sebrae Previdência (R$)</p></div></div>
+          <div class="bars">
+            <div class="bar-wrap"><div class="bar-col"><div class="bar" style="height:60%"></div></div><div class="bar-lbl">Mar</div></div>
+            <div class="bar-wrap"><div class="bar-col"><div class="bar" style="height:66%"></div></div><div class="bar-lbl">Abr</div></div>
+            <div class="bar-wrap"><div class="bar-col"><div class="bar" style="height:72%"></div></div><div class="bar-lbl">Mai</div></div>
+            <div class="bar-wrap"><div class="bar-col"><div class="bar" style="height:78%"></div></div><div class="bar-lbl">Jun</div></div>
+            <div class="bar-wrap"><div class="bar-col"><div class="bar" style="height:90%"></div></div><div class="bar-lbl">Jul</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- INADIMPLÊNCIA -->
+      <section class="view" id="inadimplencia">
+        <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+          <div class="kpi"><div class="lbl">Valor total em atraso</div><div class="val" style="font-size:24px">R$ 8.740</div><div class="delta down">▼ era R$ 12.300</div></div>
+          <div class="kpi"><div class="lbl">Participantes inadimplentes</div><div class="val">14</div><div class="delta warn">● 1,1% da carteira</div></div>
+          <div class="kpi"><div class="lbl">Em risco de cancelamento</div><div class="val">3</div><div class="delta down">+90 dias em atraso</div></div>
+          <div class="kpi"><div class="lbl">Recuperado no mês</div><div class="val" style="font-size:24px">R$ 5.120</div><div class="delta up">▲ após cobrança IA</div></div>
+        </div>
+        <div class="panel">
+          <div class="ph"><div><h3>Régua de cobrança</h3><p>Ações automáticas por faixa de atraso — sugeridas pela IA <span class="ia-tag">✦ automático</span></p></div></div>
+          <div class="ruler">
+            <div class="rstep r1"><div class="rd">1 a 15 dias</div><div class="rn">6</div><div class="rt">Aviso amigável por e-mail</div></div>
+            <div class="rstep r2"><div class="rd">16 a 45 dias</div><div class="rn">5</div><div class="rt">Notificação de pendência</div></div>
+            <div class="rstep r3"><div class="rd">46 a 90 dias</div><div class="rn">3</div><div class="rt">Alerta de suspensão</div></div>
+            <div class="rstep r4"><div class="rd">+90 dias</div><div class="rn">3</div><div class="rt">Risco de cancelamento</div></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="ph">
+            <div><h3>Participantes inadimplentes</h3><p>Priorizados por dias em atraso</p></div>
+            <button class="exp-btn" onclick="exportar('inadimplencia')">⬇ Exportar Excel</button>
+          </div>
+          <table id="tblInad">
+            <thead><tr><th>Participante</th><th>Apólice</th><th>Cobertura</th><th>Valor</th><th>Dias atraso</th><th>Faixa</th><th>Ação</th></tr></thead>
+            <tbody>
+              <tr><td>Patrícia Gomes</td><td>AP-2087</td><td>Morte + Invalidez</td><td>R$ 112,00</td><td>112</td><td><span class="pill late">Cancelamento</span></td><td><button class="act-btn" onclick="cobrar(this,'Patrícia Gomes')">Cobrar</button></td></tr>
+              <tr><td>Alexandre Pinto</td><td>AP-1902</td><td>Morte</td><td>R$ 178,00</td><td>98</td><td><span class="pill late">Cancelamento</span></td><td><button class="act-btn" onclick="cobrar(this,'Alexandre Pinto')">Cobrar</button></td></tr>
+              <tr><td>Rita Fonseca</td><td>AP-2044</td><td>Invalidez</td><td>R$ 90,00</td><td>91</td><td><span class="pill late">Cancelamento</span></td><td><button class="act-btn" onclick="cobrar(this,'Rita Fonseca')">Cobrar</button></td></tr>
+              <tr><td>Gustavo Nery</td><td>AP-2110</td><td>Morte + Invalidez</td><td>R$ 145,00</td><td>62</td><td><span class="pill warn">Suspensão</span></td><td><button class="act-btn" onclick="cobrar(this,'Gustavo Nery')">Cobrar</button></td></tr>
+              <tr><td>Helena Braga</td><td>AP-1975</td><td>Morte</td><td>R$ 88,00</td><td>34</td><td><span class="pill warn">Notificação</span></td><td><button class="act-btn" onclick="cobrar(this,'Helena Braga')">Cobrar</button></td></tr>
+              <tr><td>Diego Martins</td><td>AP-2120</td><td>Invalidez</td><td>R$ 60,00</td><td>9</td><td><span class="pill blue">Aviso</span></td><td><button class="act-btn" onclick="cobrar(this,'Diego Martins')">Cobrar</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- SINISTROS -->
+      <section class="view" id="sinistros">
+        <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi"><div class="lbl">Sinistros em análise</div><div class="val">5</div><div class="delta warn">● 2 com pendência</div></div>
+          <div class="kpi"><div class="lbl">Concluídos no mês</div><div class="val">8</div><div class="delta up">▲ dentro do SLA</div></div>
+          <div class="kpi"><div class="lbl">Tempo médio de análise</div><div class="val">6,2 <span style="font-size:15px">dias</span></div><div class="delta up">▼ era 11,4 dias</div></div>
+        </div>
+        <div class="panel">
+          <div class="ph"><div><h3>Sinistros em andamento</h3><p>Morte e invalidez</p></div></div>
+          <table>
+            <thead><tr><th>Protocolo</th><th>Participante</th><th>Tipo</th><th>Aberto em</th><th>Documentação</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>SIN-0451</td><td>Antônio Ferreira</td><td>Morte</td><td>02/07/2026</td><td><span class="pill ok">Completa</span></td><td><span class="pill blue">Em liberação</span></td></tr>
+              <tr><td>SIN-0448</td><td>Beneficiário — H. Costa</td><td>Morte</td><td>28/06/2026</td><td><span class="pill late">Falta certidão</span></td><td><span class="pill warn">Aguardando doc.</span></td></tr>
+              <tr><td>SIN-0455</td><td>Luís G. Pereira</td><td>Invalidez</td><td>08/07/2026</td><td><span class="pill warn">Falta laudo</span></td><td><span class="pill warn">Em análise</span></td></tr>
+              <tr><td>SIN-0459</td><td>Maria E. Dias</td><td>Invalidez</td><td>12/07/2026</td><td><span class="pill ok">Completa</span></td><td><span class="pill blue">Em análise</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PENDÊNCIAS -->
+      <section class="view" id="pendencias">
+        <div class="panel">
+          <div class="ph">
+            <div><h3>Pendências em aberto</h3><p>Priorizadas pela IA — mais críticas primeiro <span class="ia-tag">✦ ordenado por IA</span></p></div>
+            <button class="exp-btn" onclick="exportar('pendencias')">⬇ Exportar Excel</button>
+          </div>
+          <table>
+            <thead><tr><th>Prioridade</th><th>Pendência</th><th>Referente a</th><th>Responsável</th><th>Prazo</th><th>Documentação</th></tr></thead>
+            <tbody>
+              <tr><td><span class="pill late">Alta</span></td><td>Renovação vencendo</td><td>AP-2041 · Marcos Ribeiro</td><td>Corretora</td><td>28/07/2026</td><td><a class="doc-chip" onclick="verDoc('Apólice AP-2041')">📄 Apólice</a></td></tr>
+              <tr><td><span class="pill late">Alta</span></td><td>Certidão de óbito faltante</td><td>SIN-0448 · H. Costa</td><td>Beneficiário</td><td>25/07/2026</td><td><span class="doc-chip miss">✗ Certidão faltante</span></td></tr>
+              <tr><td><span class="pill warn">Média</span></td><td>Laudo médico pendente</td><td>SIN-0455 · L. Pereira</td><td>Seguradora</td><td>30/07/2026</td><td><span class="doc-chip miss">✗ Laudo faltante</span></td></tr>
+              <tr><td><span class="pill warn">Média</span></td><td>Confirmação de comissão</td><td>AP-1987 · F. Lima</td><td>Financeiro</td><td>05/08/2026</td><td><a class="doc-chip" onclick="verDoc('Extrato de comissão')">📄 Extrato</a></td></tr>
+              <tr><td><span class="pill blue">Baixa</span></td><td>Atualização de cadastro</td><td>AP-2115 · J. Andrade</td><td>Estipulante</td><td>11/08/2026</td><td><a class="doc-chip" onclick="verDoc('Ficha cadastral')">📄 Cadastro</a></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ASSISTENTE IA -->
+      <section class="view" id="assist">
+        <div class="demo-note">⚠️ Protótipo de demonstração — respostas baseadas em dados fictícios. Na versão real, o assistente roda no ambiente Microsoft 365 Copilot homologado.</div>
+        <div class="assist">
+          <div class="chat">
+            <div class="chat-head">
+              <div class="ai">🤖</div>
+              <div><b>Assistente de Seguros IA</b><span>Consulte a carteira em linguagem natural</span></div>
+            </div>
+            <div class="msgs" id="msgs">
+              <div class="msg bot">Olá, Luciana! 👋 Sou o assistente da Central Inteligente de Seguros. Posso consultar apólices, renovações, sinistros e pendências da carteira. O que você precisa saber?</div>
+            </div>
+            <div class="chips" id="chips">
+              <div class="chip" onclick="ask(this.innerText)">Quais apólices vencem este mês?</div>
+              <div class="chip" onclick="ask(this.innerText)">Quantas vidas têm cobertura de morte e invalidez?</div>
+              <div class="chip" onclick="ask(this.innerText)">Status do sinistro do H. Costa</div>
+              <div class="chip" onclick="ask(this.innerText)">Como está a inadimplência?</div>
+              <div class="chip" onclick="ask(this.innerText)">Quais pendências estão em aberto?</div>
+            </div>
+            <div class="composer">
+              <input id="inp" placeholder="Pergunte algo sobre a carteira…" onkeydown="if(event.key==='Enter')ask()">
+              <button onclick="ask()">Enviar</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Navegação
+  const titles={
+    dash:['Dashboard da Carteira','Visão geral dos seguros de risco — morte e invalidez'],
+    produtos:['Ramos / Produtos','Catálogo de ramos e visão de expansão multiproduto'],
+    integracoes:['Integrações (API)','Como os dados vão fluir dos sistemas para a Central'],
+    seguros:['Gestão de Seguros','Apólices, vidas cobertas e coberturas'],
+    esteira:['Esteira de Apólices','Fluxo de aceitação — proposta, análise e decisão'],
+    movimentacao:['Movimentação & Pagamento','Envio de planilha e controle financeiro'],
+    comissoes:['Painel de Comissões','Divisão entre estipulante, corretora e seguradora'],
+    inadimplencia:['Controle de Inadimplência','Atrasos, régua de cobrança e recuperação'],
+    sinistros:['Sinistros','Acompanhamento de morte e invalidez'],
+    pendencias:['Pendências','Tudo o que precisa de ação, priorizado'],
+    assist:['Assistente de Seguros IA','Consulta inteligente da carteira']
+  };
+  document.querySelectorAll('.nav li').forEach(li=>{
+    li.onclick=()=>{
+      document.querySelectorAll('.nav li').forEach(x=>x.classList.remove('active'));
+      li.classList.add('active');
+      const v=li.dataset.view;
+      document.querySelectorAll('.view').forEach(s=>s.classList.remove('active'));
+      document.getElementById(v).classList.add('active');
+      document.getElementById('viewTitle').innerText=titles[v][0];
+      document.getElementById('viewSub').innerText=titles[v][1];
+    };
+  });
+
+  // Perfil de acesso (item 3) — estipulante vê tudo; corretora/seguradora, subconjuntos
+  const PERFIS={
+    estipulante:{nome:'Luciana Cristina',av:'LC',esconde:[]},
+    corretora:{nome:'Corretora Parceira',av:'CP',esconde:['sinistros']},
+    seguradora:{nome:'ICATU Seguros',av:'IC',esconde:['comissoes','inadimplencia']}
+  };
+  function mudaPerfil(){
+    const p=document.getElementById('perfilSel').value, cfg=PERFIS[p];
+    document.getElementById('whoName').innerText=cfg.nome;
+    document.getElementById('whoAv').innerText=cfg.av;
+    document.querySelectorAll('.nav li').forEach(li=>{
+      li.classList.toggle('hide-perfil', cfg.esconde.includes(li.dataset.view));
+    });
+    // se a tela ativa foi escondida, volta ao dashboard
+    const ativa=document.querySelector('.nav li.active');
+    if(ativa && cfg.esconde.includes(ativa.dataset.view)){ document.querySelector('.nav li[data-view=dash]').click(); }
+  }
+
+  // Sino de alertas (item 7)
+  function toggleAlerts(){ document.getElementById('alertsPop').classList.toggle('show'); }
+  document.addEventListener('click',e=>{
+    if(!e.target.closest('.bell') && !e.target.closest('.alerts-pop')) document.getElementById('alertsPop').classList.remove('show');
+  });
+
+  // Exportar Excel (item 5) — gera CSV a partir da tabela visível
+  const EXP={
+    pendencias:{th:['Prioridade','Pendência','Referente a','Responsável','Prazo'],rows:[
+      ['Alta','Renovação vencendo','AP-2041 · Marcos Ribeiro','Corretora','28/07/2026'],
+      ['Alta','Certidão de óbito faltante','SIN-0448 · H. Costa','Beneficiário','25/07/2026'],
+      ['Média','Laudo médico pendente','SIN-0455 · L. Pereira','Seguradora','30/07/2026'],
+      ['Média','Confirmação de comissão','AP-1987 · F. Lima','Financeiro','05/08/2026'],
+      ['Baixa','Atualização de cadastro','AP-2115 · J. Andrade','Estipulante','11/08/2026']]},
+    inadimplencia:{th:['Participante','Apólice','Cobertura','Valor','Dias atraso','Faixa'],rows:[
+      ['Patrícia Gomes','AP-2087','Morte + Invalidez','112.00','112','Cancelamento'],
+      ['Alexandre Pinto','AP-1902','Morte','178.00','98','Cancelamento'],
+      ['Rita Fonseca','AP-2044','Invalidez','90.00','91','Cancelamento'],
+      ['Gustavo Nery','AP-2110','Morte + Invalidez','145.00','62','Suspensão'],
+      ['Helena Braga','AP-1975','Morte','88.00','34','Notificação'],
+      ['Diego Martins','AP-2120','Invalidez','60.00','9','Aviso']]},
+    movimentacao:{th:['Matrícula','Segurado','CPF','Cap.Morte','Cap.Invalidez','Prêmio','Mod/Sub','Pagamento'],rows:[
+      ['100001','Ana Beatriz Souza','384.517.920-41','150000','150000','60.70','101/01','Pago'],
+      ['100002','Carlos Henrique Lima','617.283.945-08','200000','200000','81.10','101/01','Pago'],
+      ['100003','Fernanda Alves Rocha','275.619.438-70','120000','120000','50.10','101/02','Pago'],
+      ['100004','Gustavo Pereira Martins','948.160.372-59','250000','250000','102.00','101/02','A pagar'],
+      ['100005','Juliana Cristina Moraes','503.847.126-91','180000','180000','69.60','101/01','Pago'],
+      ['100006','Marcelo Augusto Nunes','861.395.704-22','100000','100000','42.30','101/03','Pago'],
+      ['100007','Patrícia Oliveira Costa','429.851.630-17','220000','220000','88.70','101/01','Em atraso'],
+      ['100008','Ricardo Mendes Ferreira','796.214.853-64','300000','300000','122.00','101/02','Pago'],
+      ['100009','Simone Aparecida Lopes','154.762.398-53','160000','160000','64.70','101/03','A pagar'],
+      ['100010','Thiago Rodrigues Barros','682.940.517-85','140000','140000','56.90','101/01','Pago']]}
+  };
+  function exportar(qual){
+    const d=EXP[qual]; if(!d)return;
+    let csv='\uFEFF'+d.th.join(';')+'\n'+d.rows.map(r=>r.join(';')).join('\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='Central_Seguros_'+qual+'.csv'; a.click();
+  }
+
+  // Ver documento anexado (item 6)
+  function verDoc(nome){ alert('📄 Abrindo documento: '+nome+'\n\n(Protótipo — no sistema real abre o arquivo anexado no ambiente homologado.)'); }
+
+  // Emissão de boletos
+  function emitir(btn,conv){
+    const orig=btn.innerText; btn.innerText='Emitindo…'; btn.disabled=true;
+    setTimeout(()=>{ btn.innerText='Boleto emitido ✓'; },700);
+  }
+  function mudaComp(){
+    const v=document.getElementById('compSel').value;
+    document.getElementById('compTag').innerText='Competência '+v;
+    // reabilita botões ao trocar competência
+    document.querySelectorAll('.conv button').forEach(b=>{b.disabled=false;b.innerText='Emitir boleto';});
+  }
+
+  // Cobrança simulada
+  function cobrar(btn,nome){
+    btn.innerText='Enviado ✓'; btn.style.background='#1E9E5B'; btn.style.color='#fff'; btn.style.borderColor='#1E9E5B'; btn.disabled=true;
+  }
+
+  // Upload simulado da planilha
+  function simulaUpload(){
+    const box=document.getElementById('upSteps'); box.style.display='flex';
+    const ids=['st1','st2','st3','st4'];
+    ids.forEach(id=>document.getElementById(id).classList.remove('done'));
+    ids.forEach((id,i)=>setTimeout(()=>document.getElementById(id).classList.add('done'),(i+1)*550));
+  }
+
+  // Busca em tabela
+  function filterTable(input,id){
+    const q=input.value.toLowerCase();
+    document.querySelectorAll('#'+id+' tbody tr').forEach(tr=>{
+      tr.style.display=tr.innerText.toLowerCase().includes(q)?'':'none';
+    });
+  }
+
+  // Assistente (respostas roteirizadas p/ demo)
+  const KB=[
+    {k:['vence','vencem','renova','renovação','este mês','este mes'],a:`Encontrei <b>3 apólices</b> com renovação até o fim do mês:<table><tr><th>Apólice</th><th>Participante</th><th>Vencimento</th></tr><tr><td>AP-2041</td><td>Marcos A. Ribeiro</td><td>28/07 (7 dias)</td></tr><tr><td>AP-1899</td><td>Sônia R. Batista</td><td>30/07 (9 dias)</td></tr><tr><td>AP-1987</td><td>Fernanda C. Lima</td><td>03/08 (13 dias)</td></tr></table>Quer que eu <b>gere os comunicados de renovação</b> para a corretora?`},
+    {k:['integra','api','trust prev','trustprev','conex','automátic','automatic','sincroniz'],a:`Hoje a base chega por <b>envio de planilha</b> (sem integração — já funciona). A evolução é a <b>integração via API</b>: na <b>Fase 3</b>, os dados passam a vir automaticamente da <b>ICATU</b> (apólices e sinistros), da <b>corretora</b> (movimentações e comissões) e do <b>Trust Prev</b> (cadastro). A <b>Área do Participante</b> entra na Fase 4. Tudo depende de credenciais, homologação de segurança e validação da área — por isso é etapa posterior ao MVP.`},
+    {k:['ramo','ramos','produto','produtos','auto','viagem','bike','residencial','multiproduto','diversos'],a:`Hoje a Central opera o ramo <b>Morte e Invalidez</b> (risco), em plena operação. No roadmap de expansão multiproduto estão: <b>Auto</b> e <b>Viagem</b> (Fase 2), <b>Bike</b> e <b>Residencial</b> (Fase 3). O diferencial é o <b>motor único</b>: o mesmo fluxo de esteira, movimentação, comissão e cobrança — e este assistente — atende qualquer ramo. Adicionar um produto novo é configuração, não recomeço.`},
+    {k:['costa','sin-0448','óbito','obito'],a:`O sinistro <b>SIN-0448 (H. Costa)</b> — tipo <b>Morte</b>, aberto em 28/06/2026 — está <b>aguardando documentação</b>.<br>⚠️ Pendência: <b>certidão de óbito faltante</b> (prazo 25/07). Este é o item de <b>prioridade Alta</b> hoje. Quer que eu prepare a <b>notificação ao beneficiário</b>?`},
+    {k:['pendência','pendencia','pendências','pendencias','aberto','abertas'],a:`Há <b>12 pendências abertas</b>. As 3 mais críticas, priorizadas:<table><tr><th>Prioridade</th><th>Pendência</th><th>Prazo</th></tr><tr><td>Alta</td><td>Renovação AP-2041 (M. Ribeiro)</td><td>28/07</td></tr><tr><td>Alta</td><td>Certidão faltante SIN-0448</td><td>25/07</td></tr><tr><td>Média</td><td>Laudo médico SIN-0455</td><td>30/07</td></tr></table>`},
+    {k:['sinistro','sinistros','andamento','análise','analise'],a:`Há <b>5 sinistros em andamento</b>: 3 de morte e 2 de invalidez. Dois deles têm pendência de documentação (SIN-0448 e SIN-0455). O <b>tempo médio de análise</b> caiu para <b>6,2 dias</b> (era 11,4). Quer ver o detalhe de algum protocolo?`},
+    {k:['capital','segurado','total'],a:`O <b>capital segurado total</b> da carteira é <b>R$ 812,4 milhões</b>, distribuídos em 1.284 apólices ativas. A maior concentração está na cobertura de <b>Morte</b> (52%).`},
+    {k:['comissão','comissao','comissões','comissoes','repasse','prêmio','premio'],a:`Na competência <b>07/2026</b>, sobre o prêmio de <b>R$ 214.700</b>, a divisão de comissões é:<table><tr><th>Agente</th><th>%</th><th>Valor</th></tr><tr><td>Estipulante (Sebrae Prev)</td><td>10%</td><td>R$ 21.470</td></tr><tr><td>Corretora</td><td>15%</td><td>R$ 32.205</td></tr><tr><td>Seguradora (ICATU)</td><td>75%</td><td>R$ 161.025</td></tr></table>`},
+    {k:['esteira','proposta','aceitação','aceitacao','subscrição','subscricao','análise de risco'],a:`Na <b>esteira de aceitação</b> há hoje: <b>3 propostas recebidas</b>, <b>2 em análise</b> (subscrição), <b>2 aceitas</b> (aguardando emissão) e <b>2 pendentes</b> — sendo 1 recusada por risco agravado. A pendência ativa é a <b>PROP-3005 (Sandra Vieira)</b>: falta a DPS assinada.`},
+    {k:['movimenta','pagamento','planilha','pago','a pagar','atraso','prêmio','premio','competência','competencia'],a:`Na competência <b>07/2026</b> (módulo 101 — risco morte/invalidez), a base tem <b>10 segurados</b>:<br>• Prêmio total: <b>R$ 738,10</b><br>• Capital morte: <b>R$ 1.820.000</b> · Capital invalidez: <b>R$ 1.820.000</b><br>• Pagamentos: 7 pagos, 2 a pagar e <b>1 em atraso</b> (Patrícia Oliveira Costa). Quer que eu gere a cobrança do pagamento em atraso?`},
+    {k:['boleto','boletos','convênio','convenio','fenacon','opbb','corecon','fenasebrae','emitir'],a:`Na competência <b>07/2026</b>, os boletos a emitir por convênio somam <b>R$ 214.700</b>:<table><tr><th>Convênio</th><th>Vidas</th><th>Valor</th></tr><tr><td>FenaSebrae</td><td>1.651</td><td>R$ 68.000</td></tr><tr><td>FENACON</td><td>1.128</td><td>R$ 74.320</td></tr><tr><td>OPBB</td><td>642</td><td>R$ 41.870</td></tr><tr><td>CORECON</td><td>489</td><td>R$ 30.510</td></tr></table>Da competência anterior (06/2026), o boleto da <b>OPBB</b> ainda está em aberto. Quer que eu reforce a cobrança?`},
+    {k:['inadimpl','inadimplência','inadimplencia','cobrança','cobranca','em atraso','cancelamento','devendo'],a:`Hoje há <b>14 participantes inadimplentes</b>, somando <b>R$ 8.740</b> em atraso. Situação por faixa:<table><tr><th>Faixa</th><th>Qtd</th><th>Ação sugerida</th></tr><tr><td>1–15 dias</td><td>6</td><td>Aviso amigável</td></tr><tr><td>16–45 dias</td><td>5</td><td>Notificação</td></tr><tr><td>46–90 dias</td><td>3</td><td>Alerta de suspensão</td></tr><tr><td>+90 dias</td><td>3</td><td>Risco de cancelamento</td></tr></table>⚠️ <b>3 participantes</b> estão em risco de cancelamento (Patrícia Gomes, Alexandre Pinto e Rita Fonseca). Quer que eu <b>dispare a régua de cobrança</b>?`}
+  ];
+  function reply(q){
+    q=q.toLowerCase();
+    for(const item of KB){ if(item.k.some(w=>q.includes(w))) return item.a; }
+    return `Posso te ajudar com <b>apólices, renovações, sinistros, pendências e capital segurado</b>. Tente perguntar, por exemplo: “quais apólices vencem este mês?” ou “status do sinistro do H. Costa”.`;
+  }
+  function addMsg(html,cls){
+    const d=document.createElement('div'); d.className='msg '+cls; d.innerHTML=html;
+    document.getElementById('msgs').appendChild(d);
+    const m=document.getElementById('msgs'); m.scrollTop=m.scrollHeight;
+  }
+  function ask(text){
+    const inp=document.getElementById('inp');
+    const q=(text||inp.value).trim(); if(!q)return;
+    addMsg(q,'me'); inp.value='';
+    const t=document.createElement('div'); t.className='msg bot'; t.innerHTML='<div class="typing"><span></span><span></span><span></span></div>';
+    document.getElementById('msgs').appendChild(t);
+    const m=document.getElementById('msgs'); m.scrollTop=m.scrollHeight;
+    setTimeout(()=>{ t.remove(); addMsg(reply(q),'bot'); },750);
+  }
+</script>
+</body>
+</html>

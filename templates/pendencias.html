@@ -1,0 +1,139 @@
+{# ==================================================================
+   pendencias.html — Pendencias em aberto
+   ==================================================================
+   No prototipo a lista vinha "priorizada pela IA". Aqui a ordem e uma
+   regra simples e explicavel: primeiro por prioridade (Alta, Media,
+   Baixa) e, dentro de cada uma, pelo prazo mais proximo.
+   ================================================================== #}
+{% extends "base.html" %}
+
+{% block titulo %}Pendências — Central de Seguros{% endblock %}
+{% block cabecalho %}Pendências{% endblock %}
+{% block subcabecalho %}O que falta resolver, do mais crítico para o menos crítico{% endblock %}
+
+{% block conteudo %}
+
+  <div class="kpis">
+    <div class="kpi">
+      <div class="lbl">Pendências abertas</div>
+      <div class="val">{{ kpis.abertas }}</div>
+      <div class="delta">de {{ kpis.total }} no total</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Prioridade alta</div>
+      <div class="val">{{ kpis.altas }}</div>
+      <div class="delta down">● tratar primeiro</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Documentos faltando</div>
+      <div class="val">{{ kpis.sem_documento }}</div>
+      <div class="delta warn">● dependem de terceiros</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Vencendo em 7 dias</div>
+      <div class="val">{{ kpis.urgentes }}</div>
+      <div class="delta warn">● prazo curto</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Pendências em aberto</h3>
+        <p>Ordenadas por prioridade e prazo <span class="ia-tag">✦ mais críticas primeiro</span></p>
+      </div>
+      <a class="exp-btn" href="/pendencias/exportar" download>⬇ Exportar Excel</a>
+    </div>
+
+    <div class="tabela-rolagem">
+      <table>
+        <thead>
+          <tr>
+            <th>Prioridade</th>
+            <th>Pendência</th>
+            <th>Referente a</th>
+            <th>Responsável</th>
+            <th>Prazo</th>
+            <th class="num">Faltam</th>
+            <th>Documentação</th>
+            <th>Ação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in pendencias %}
+            <tr>
+              <td><span class="pill {{ p.cor_prioridade() }}">{{ p.prioridade }}</span></td>
+              <td>{{ p.titulo }}</td>
+              <td>{{ p.referente or '—' }}</td>
+              <td>{{ p.responsavel or '—' }}</td>
+              <td>{{ p.prazo.strftime('%d/%m/%Y') if p.prazo else '—' }}</td>
+              <td class="num">
+                {% if p.prazo %}
+                  {% set dias = (p.prazo - hoje).days %}
+                  {% if dias < 0 %}
+                    <span class="pill late">Atrasada</span>
+                  {% else %}
+                    {{ dias }} dia{{ 's' if dias != 1 }}
+                  {% endif %}
+                {% else %}—{% endif %}
+              </td>
+              <td>
+                {% if p.documento_ok %}
+                  <span class="doc-chip">📄 {{ p.documento }}</span>
+                {% else %}
+                  <span class="doc-chip miss">✗ {{ p.documento }}</span>
+                {% endif %}
+              </td>
+              <td>
+                <form method="post" action="/pendencias/resolver/{{ p.id }}">
+                  <button type="submit" class="act-btn">Marcar resolvida</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="8" class="vazio">Nenhuma pendência em aberto. 🎉</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {# ---------- JA RESOLVIDAS ---------- #}
+  {% if resolvidas %}
+    <div class="panel">
+      <div class="ph">
+        <div>
+          <h3>Pendências resolvidas</h3>
+          <p>Histórico do que já foi tratado</p>
+        </div>
+      </div>
+      <div class="tabela-rolagem">
+        <table>
+          <thead>
+            <tr>
+              <th>Prioridade</th>
+              <th>Pendência</th>
+              <th>Referente a</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in resolvidas %}
+              <tr>
+                <td><span class="pill cinza">{{ p.prioridade }}</span></td>
+                <td>{{ p.titulo }}</td>
+                <td>{{ p.referente or '—' }}</td>
+                <td>
+                  <form method="post" action="/pendencias/reabrir/{{ p.id }}">
+                    <button type="submit" class="act-btn">Reabrir</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+
+{% endblock %}

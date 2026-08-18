@@ -1,0 +1,71 @@
+{# ==================================================================
+   seguros.html — a carteira de apolices
+   ==================================================================
+   Equivale a tela "Gestao de Seguros" do prototipo, mas lendo as
+   apolices de verdade do banco de dados.
+   ================================================================== #}
+{% extends "base.html" %}
+
+{% block titulo %}Gestão de Seguros — Central de Seguros{% endblock %}
+{% block cabecalho %}Gestão de Seguros{% endblock %}
+{% block subcabecalho %}Apólices, vidas cobertas e coberturas{% endblock %}
+
+{% block conteudo %}
+
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Carteira de apólices</h3>
+        <p>{{ apolices|length }} apólices no total</p>
+      </div>
+      {# Este campo filtra a tabela na hora, sem recarregar a pagina.
+         A funcao filtrarTabela esta em static/js/main.js #}
+      <input class="search" type="search"
+             placeholder="Buscar participante ou apólice…"
+             oninput="filtrarTabela(this, 'tabelaApolices')">
+    </div>
+
+    <div class="tabela-rolagem">
+      <table id="tabelaApolices">
+        <thead>
+          <tr>
+            <th>Apólice</th>
+            <th>Participante</th>
+            <th>Cobertura</th>
+            <th class="num">Capital segurado</th>
+            <th>Início</th>
+            <th>Vencimento</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in apolices %}
+            <tr>
+              <td>{{ a.numero_apolice }}</td>
+              <td>{{ a.participante }}</td>
+              <td>{{ a.cobertura }}</td>
+              <td class="num">{{ a.capital_formatado() }}</td>
+              <td>{{ a.data_inicio.strftime('%d/%m/%Y') }}</td>
+              <td>{{ a.data_vencimento.strftime('%d/%m/%Y') }}</td>
+              <td>
+                {# cada status tem a sua cor #}
+                {% if a.status == 'Ativa' %}
+                  <span class="pill ok">Ativa</span>
+                {% elif a.status == 'A renovar' %}
+                  <span class="pill warn">A renovar</span>
+                {% elif a.status == 'Vencida' %}
+                  <span class="pill late">Vencida</span>
+                {% else %}
+                  <span class="pill cinza">{{ a.status }}</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7" class="vazio">Nenhuma apólice cadastrada.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+{% endblock %}

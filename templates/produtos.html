@@ -1,0 +1,73 @@
+{# ==================================================================
+   produtos.html — Ramos / Produtos
+   ==================================================================
+   Tela informativa: mostra o ramo que opera hoje (com numeros reais do
+   banco) e os ramos previstos no roadmap.
+   ================================================================== #}
+{% extends "base.html" %}
+
+{% block titulo %}Ramos / Produtos — Central de Seguros{% endblock %}
+{% block cabecalho %}Ramos / Produtos{% endblock %}
+{% block subcabecalho %}O que a Central opera hoje e o que está previsto{% endblock %}
+
+{% block conteudo %}
+
+  <div class="engine-note">
+    <div class="en-ic">⚙️</div>
+    <div>
+      <b>Motor único, vários ramos.</b>
+      <p>
+        O mesmo fluxo de esteira, movimentação, comissão e inadimplência atende
+        qualquer ramo. Adicionar um novo produto é configuração — não recomeçar do zero.
+      </p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Catálogo de ramos</h3>
+        <p>Risco em operação hoje · demais ramos no roadmap de expansão</p>
+      </div>
+    </div>
+
+    <div class="prod-grid">
+
+      {# --- O ramo que existe de verdade, com numeros do banco --- #}
+      <div class="prod active">
+        <div class="stat">● Ativo</div>
+        <div class="picon">🛡️</div>
+        <h4>Morte e Invalidez</h4>
+        <p>Seguro de risco — cobertura por falecimento e invalidez. Em plena operação.</p>
+        <div class="metrics">
+          <div><b>{{ numeros.apolices }}</b>apólices</div>
+          <div><b>{{ numeros.vidas }}</b>vidas</div>
+          <div><b>{{ numeros.capital }}</b>capital</div>
+        </div>
+      </div>
+
+      {# --- Os ramos do roadmap --- #}
+      {% for ramo in roadmap %}
+        <div class="prod soon">
+          <div class="stat">Em breve</div>
+          <div class="picon">{{ ramo.icone }}</div>
+          <h4>{{ ramo.nome }}</h4>
+          <p>{{ ramo.descricao }}</p>
+          <div class="metrics">
+            <div><b>{{ ramo.fase }}</b>roadmap</div>
+            <div><b>—</b></div>
+            <div><b>—</b></div>
+          </div>
+        </div>
+      {% endfor %}
+
+      <div class="prod soon" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;border-style:dashed">
+        <div class="picon" style="background:transparent">➕</div>
+        <h4 style="color:var(--muted)">Novos ramos</h4>
+        <p>A arquitetura aceita novos produtos conforme a estratégia do Sebrae Previdência.</p>
+      </div>
+
+    </div>
+  </div>
+
+{% endblock %}
