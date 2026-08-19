@@ -19,6 +19,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block titulo %}Central Inteligente de Seguros{% endblock %}</title>
+  {# O favicon e o iconezinho que aparece na aba do navegador. #}
+  <link rel="icon" type="image/jpeg" href="/static/img/favicon.jpg">
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
@@ -26,13 +28,15 @@
 
   {# ---------- MENU LATERAL ---------- #}
   <aside class="side">
-    <div class="brand">
-      <div class="logo">SP</div>
-      <div>
-        <b>Central de Seguros</b>
-        <span>Sebrae Previdência</span>
+    {# A marca: o logo oficial em cima, o nome do sistema embaixo.
+       O logo fica sobre um retangulo branco porque ele e azul escuro —
+       sobre o azul do menu ele desapareceria. #}
+    <a class="brand" href="/dashboard">
+      <div class="brand-logo">
+        <img src="/static/img/sebraeprev.webp" alt="Sebrae Previdência">
       </div>
-    </div>
+      <div class="brand-nome">Central de Seguros</div>
+    </a>
 
     <ul class="nav">
       {% for item in menu %}

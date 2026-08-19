@@ -406,10 +406,12 @@ def montar_grafico_cobertura(db: Session) -> list[dict]:
     Comeca em 25 para a primeira fatia nascer no topo, e cada fatia
     seguinte comeca de onde a anterior parou.
     """
+    # Cores da paleta oficial Sebrae Previdencia.
+    # Blue Prev, Sky Cloud e Navy Sea — as mesmas do arquivo style.css.
     cores = {
-        "Morte": "#1F3B8C",
-        "Invalidez": "#3B8FD4",
-        "Morte + Invalidez": "#2E75B6",
+        "Morte": "#1517B3",              # Blue Prev
+        "Invalidez": "#1A98DA",          # Sky Cloud
+        "Morte + Invalidez": "#071F59",  # Navy Sea
     }
 
     contagem = (

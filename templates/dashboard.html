@@ -94,7 +94,9 @@
            stroke-dashoffset  = onde a fatia comeca no circulo.
            Os dois numeros ja vem calculados do main.py. #}
         <svg width="150" height="150" viewBox="0 0 42 42">
-          <circle cx="21" cy="21" r="15.9" fill="none" stroke="#EEF2F8" stroke-width="7"/>
+          {# o anel cinza do fundo, sobre o qual as fatias sao desenhadas #}
+          <circle cx="21" cy="21" r="15.9" fill="none"
+                  stroke="var(--linha-suave)" stroke-width="7"/>
           {% for fatia in cobertura %}
             <circle cx="21" cy="21" r="15.9" fill="none"
                     stroke="{{ fatia.cor }}" stroke-width="7"

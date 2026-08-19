@@ -1,4 +1,4 @@
-/* ==================================================================
+﻿/* ==================================================================
    Central Inteligente de Seguros — folha de estilo
    ==================================================================
    As cores e os componentes foram tirados do arquivo
@@ -21,19 +21,76 @@
    basta trocar aqui em um lugar so.
    ------------------------------------------------------------------ */
 :root {
-  --navy: #0E2A6B;
-  --blue: #1F3B8C;
-  --blue2: #2E75B6;
-  --sky: #3B8FD4;
-  --bg: #EEF2F8;
-  --card: #FFFFFF;
-  --ink: #1B2437;
-  --muted: #6B7691;
-  --line: #E2E8F2;
-  --green: #1E9E5B;
-  --amber: #D9930A;
-  --red: #D64545;
-  --shadow: 0 1px 3px rgba(16, 42, 107, .08), 0 8px 24px rgba(16, 42, 107, .06);
+  /* ----------------------------------------------------------------
+     PALETA OFICIAL SEBRAE PREVIDENCIA
+     ----------------------------------------------------------------
+     As 9 cores da marca, com o nome oficial de cada uma.
+     Nao altere estes valores: eles sao o padrao da instituicao.
+     ---------------------------------------------------------------- */
+  --blue-prev: #1517B3;     /* primaria      */
+  --dark-indigo: #121494;   /* contraste     */
+  --navy-sea: #071F59;      /* secundaria    */
+  --sky-cloud: #1A98DA;     /* secundaria    */
+  --pink-face: #EFD7E5;     /* secundaria    */
+  --black-screen: #100C08;  /* apoio         */
+  --gray-steel: #A6A8B0;    /* apoio         */
+  --white-moon: #EDEDED;    /* apoio         */
+  --green-leaf: #44D62C;    /* acento        */
+
+  /* ----------------------------------------------------------------
+     COMO A PALETA E USADA NO SISTEMA
+     ----------------------------------------------------------------
+     Abaixo damos um "cargo" para cada cor. Se um dia a marca mudar,
+     basta trocar as 9 cores acima e o site inteiro acompanha.
+     ---------------------------------------------------------------- */
+  --navy: var(--navy-sea);       /* topo do menu lateral        */
+  --blue: var(--blue-prev);      /* botoes, links, destaques    */
+  --blue-escuro: var(--dark-indigo); /* botao pressionado/hover */
+  --blue2: var(--sky-cloud);     /* avatares, foco, graficos    */
+  --bg: var(--white-moon);       /* fundo das paginas           */
+  --card: #FFFFFF;               /* fundo dos cartoes           */
+  --ink: var(--black-screen);    /* cor do texto                */
+  --rosa: var(--pink-face);      /* realces suaves              */
+
+  /* ----------------------------------------------------------------
+     TONS DERIVADOS — e o motivo de cada um
+     ----------------------------------------------------------------
+     Tres cores da paleta sao claras demais para virarem TEXTO sobre
+     fundo branco: quem enxerga pouco nao conseguiria ler. Entao elas
+     continuam sendo usadas como PREENCHIMENTO (barras, bolinhas,
+     bordas) e criamos versoes escurecidas so para o texto.
+     ---------------------------------------------------------------- */
+  --sky: #5FB8E8;    /* Sky Cloud clareado: ponta clara dos degrades */
+  --muted: #5C5E66;  /* Gray Steel escurecido: texto secundario legivel */
+  --line: #DCDDE1;   /* Gray Steel clareado: bordas e divisorias */
+  --green: #1F6B14;  /* Green Leaf escurecido: texto de sucesso */
+
+  /* Cores de aviso e de erro. A paleta oficial nao define nenhuma,
+     entao escolhemos dois tons que combinam com ela e que tem
+     contraste suficiente para leitura sobre os fundos claros abaixo. */
+  --amber: #8A5200;
+  --red: #B3311F;
+
+  /* ----------------------------------------------------------------
+     FUNDOS SUAVES (as "etiquetas" coloridas e os avisos)
+     ----------------------------------------------------------------
+     Cada par abaixo e um fundo bem claro + uma borda um tom acima,
+     derivados da cor correspondente. O TEXTO em cima deles usa sempre
+     a versao escura (--green, --amber, --red, --blue), garantindo
+     leitura confortavel.
+     ---------------------------------------------------------------- */
+  --verde-claro: #E4F9DF;
+  --verde-borda: #B4EDA7;
+  --amarelo-claro: #FBF0DA;
+  --amarelo-borda: #EDD9A8;
+  --vermelho-claro: #FAE5E3;
+  --vermelho-borda: #F0C4BF;
+  --azul-claro: #E8E9F7;
+  --azul-borda: #CBCDEE;
+  --cinza-claro: #F6F7F9;
+  --linha-suave: #EDEEF1;
+
+  --shadow: 0 1px 3px rgba(7, 31, 89, .10), 0 8px 24px rgba(7, 31, 89, .07);
 }
 
 /* ------------------------------------------------------------------
@@ -77,35 +134,26 @@ body.tela-login {
   padding: 34px 32px 28px;
 }
 
+/* A marca no login: logo oficial em cima, nome do sistema embaixo. */
 .login-marca {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 6px;
+  text-align: center;
+  margin-bottom: 4px;
 }
 
-.login-marca .logo {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
-  background: var(--blue);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  font-weight: 800;
-  font-size: 16px;
-  letter-spacing: -1px;
-}
-
-.login-marca b {
-  font-size: 17px;
+.login-logo {
+  /* height fixa + width auto mantem a proporcao original do arquivo */
+  height: 34px;
+  width: auto;
+  max-width: 100%;
   display: block;
-  line-height: 1.2;
+  margin: 0 auto 12px;
 }
 
-.login-marca span {
-  font-size: 12px;
-  color: var(--muted);
+.login-nome {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--navy);
+  letter-spacing: -.2px;
 }
 
 .login-titulo {
@@ -153,7 +201,7 @@ body.tela-login {
 
 .perfis input:checked + label {
   border-color: var(--blue);
-  background: #EEF3FB;
+  background: var(--azul-claro);
   color: var(--blue);
 }
 
@@ -213,13 +261,13 @@ body.tela-login {
 }
 
 .btn-entrar:hover {
-  background: var(--navy);
+  background: var(--blue-escuro);
 }
 
 /* --- Mensagem de erro do login --- */
 .erro {
-  background: #FBE6E6;
-  border: 1px solid #F3C9C9;
+  background: var(--vermelho-claro);
+  border: 1px solid var(--vermelho-borda);
   color: var(--red);
   font-size: 13px;
   padding: 11px 14px;
@@ -232,9 +280,9 @@ body.tela-login {
 
 /* --- Aviso de dados ficticios --- */
 .aviso-demo {
-  background: #FFF8E8;
-  border: 1px solid #F0DCA8;
-  color: #8A6B14;
+  background: var(--amarelo-claro);
+  border: 1px solid var(--amarelo-borda);
+  color: var(--amber);
   font-size: 11.5px;
   padding: 10px 13px;
   border-radius: 8px;
@@ -275,39 +323,38 @@ body.tela-login {
   flex-direction: column;
 }
 
+/* A marca no menu lateral: logo oficial em cima, nome embaixo. */
 .brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 6px 22px;
-  border-bottom: 1px solid rgba(255, 255, 255, .12);
+  display: block;
+  text-align: center;
+  padding: 2px 4px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, .14);
   margin-bottom: 14px;
 }
 
-.brand .logo {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
+/* O logo e azul escuro. Sobre o azul do menu ele sumiria, entao vai
+   dentro de um retangulo branco — assim as cores oficiais da marca
+   ficam preservadas e o logo continua legivel. */
+.brand-logo {
   background: #fff;
-  display: grid;
-  place-items: center;
-  font-weight: 800;
-  color: var(--blue);
-  font-size: 15px;
-  letter-spacing: -1px;
+  border-radius: 9px;
+  padding: 9px 12px;
+  margin-bottom: 10px;
 }
 
-.brand b {
-  font-size: 15px;
-  line-height: 1.15;
-  font-weight: 700;
-}
-
-.brand span {
+.brand-logo img {
+  height: 24px;
+  width: auto;
+  max-width: 100%;
   display: block;
-  font-size: 11px;
-  color: #B9C9EC;
-  font-weight: 500;
+  margin: 0 auto;
+}
+
+.brand-nome {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -.1px;
 }
 
 .nav {
@@ -324,7 +371,7 @@ body.tela-login {
   gap: 11px;
   padding: 11px 12px;
   border-radius: 9px;
-  color: #D3DEF6;
+  color: #C9CEEA;
   font-size: 14px;
   font-weight: 500;
   transition: .15s;
@@ -351,7 +398,7 @@ body.tela-login {
   border-radius: 9px;
   font-size: 14px;
   font-weight: 500;
-  color: #7E93C4;
+  color: #828CB5;
   cursor: not-allowed;
   opacity: .55;
 }
@@ -364,7 +411,7 @@ body.tela-login {
 .side-foot {
   margin-top: auto;
   font-size: 11px;
-  color: #9FB4E0;
+  color: #9BA3C9;
   padding: 12px 8px 0;
   border-top: 1px solid rgba(255, 255, 255, .12);
 }
@@ -372,7 +419,7 @@ body.tela-login {
 .badge-mvp {
   display: inline-block;
   background: rgba(255, 255, 255, .14);
-  color: #DCE7FB;
+  color: #DDE1F4;
   font-size: 10px;
   padding: 3px 8px;
   border-radius: 20px;
@@ -575,7 +622,7 @@ td {
 }
 
 tr:hover td {
-  background: #F7FAFE;
+  background: var(--cinza-claro);
 }
 
 .num {
@@ -593,11 +640,11 @@ tr:hover td {
   white-space: nowrap;
 }
 
-.pill.ok { background: #E4F6EC; color: var(--green); }
-.pill.warn { background: #FCF2DD; color: var(--amber); }
-.pill.late { background: #FBE6E6; color: var(--red); }
-.pill.blue { background: #E7F0FB; color: var(--blue2); }
-.pill.cinza { background: #EDF0F5; color: var(--muted); }
+.pill.ok { background: var(--verde-claro); color: var(--green); }
+.pill.warn { background: var(--amarelo-claro); color: var(--amber); }
+.pill.late { background: var(--vermelho-claro); color: var(--red); }
+.pill.blue { background: var(--azul-claro); color: var(--blue2); }
+.pill.cinza { background: var(--linha-suave); color: var(--muted); }
 
 /* --- Campo de busca --- */
 .search {
@@ -653,9 +700,9 @@ tr:hover td {
 
 /* --- Aviso amarelo dentro do sistema --- */
 .demo-note {
-  background: #FFF8E8;
-  border: 1px solid #F0DCA8;
-  color: #8A6B14;
+  background: var(--amarelo-claro);
+  border: 1px solid var(--amarelo-borda);
+  color: var(--amber);
   font-size: 12px;
   padding: 9px 14px;
   border-radius: 8px;
@@ -700,16 +747,19 @@ tr:hover td {
    Copiados do prototipo, um bloco por tela.
    ================================================================== */
 
-/* --- Etiqueta "IA" --- */
+/* --- Etiqueta de destaque (ex.: "✦ automático") ---
+   Usa o Pink Face da paleta como fundo, com texto Navy Sea por cima
+   para garantir contraste. */
 .ia-tag {
-  background: #EEF3FB;
-  color: var(--blue);
-  border: 1px solid #DBE6F6;
+  background: var(--pink-face);
+  color: var(--navy);
+  border: 1px solid #E2C2D3;
   font-size: 10.5px;
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 20px;
   margin-left: 6px;
+  white-space: nowrap;
 }
 
 /* --- Botoes de acao dentro das tabelas --- */
@@ -735,7 +785,7 @@ tr:hover td {
 }
 
 .act-btn:disabled {
-  background: #EDF0F5;
+  background: var(--linha-suave);
   color: var(--muted);
   border-color: var(--line);
   cursor: default;
@@ -794,7 +844,7 @@ tr:hover td {
 }
 
 .col {
-  background: #F3F6FB;
+  background: var(--cinza-claro);
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 12px;
@@ -859,7 +909,7 @@ tr:hover td {
 }
 
 .card-mini .mt span {
-  background: #F3F6FB;
+  background: var(--cinza-claro);
   border-radius: 5px;
   padding: 2px 7px;
 }
@@ -911,7 +961,7 @@ tr:hover td {
 
 .comm .prog {
   height: 7px;
-  background: #EEF2F8;
+  background: var(--linha-suave);
   border-radius: 20px;
   margin-top: 12px;
   overflow: hidden;
@@ -935,13 +985,13 @@ tr:hover td {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 14px;
-  background: #F7FAFE;
+  background: var(--cinza-claro);
   border-left: 4px solid var(--blue2);
 }
 
 .rstep.r1 { border-left-color: var(--blue2); }
 .rstep.r2 { border-left-color: var(--amber); }
-.rstep.r3 { border-left-color: #E07B39; }
+.rstep.r3 { border-left-color: var(--amber); }
 .rstep.r4 { border-left-color: var(--red); }
 
 .rstep .rd {
@@ -1039,7 +1089,7 @@ tr:hover td {
 }
 
 .conv button:hover {
-  background: var(--navy);
+  background: var(--blue-escuro);
 }
 
 /* --- Barra de selecao de competencia --- */
@@ -1062,7 +1112,7 @@ tr:hover td {
 
 /* --- PRODUTOS: catalogo de ramos --- */
 .engine-note {
-  background: linear-gradient(90deg, #F4F8FD, #fff);
+  background: linear-gradient(90deg, var(--cinza-claro), #fff);
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 16px 20px;
@@ -1109,7 +1159,7 @@ tr:hover td {
 }
 
 .prod.soon {
-  background: #FAFCFF;
+  background: var(--cinza-claro);
 }
 
 .prod .stat {
@@ -1120,12 +1170,12 @@ tr:hover td {
   font-weight: 700;
   padding: 3px 9px;
   border-radius: 20px;
-  background: #EDF0F5;
+  background: var(--linha-suave);
   color: var(--muted);
 }
 
 .prod.active .stat {
-  background: #E4F6EC;
+  background: var(--verde-claro);
   color: var(--green);
 }
 
@@ -1133,7 +1183,7 @@ tr:hover td {
   width: 44px;
   height: 44px;
   border-radius: 11px;
-  background: #EEF3FB;
+  background: var(--azul-claro);
   display: grid;
   place-items: center;
   font-size: 21px;
@@ -1197,7 +1247,7 @@ tr:hover td {
 
 .api-node.hub {
   border-color: var(--blue2);
-  background: linear-gradient(180deg, #F4F8FD, #fff);
+  background: linear-gradient(180deg, var(--cinza-claro), #fff);
   box-shadow: var(--shadow);
 }
 
@@ -1272,16 +1322,16 @@ tr:hover td {
   white-space: nowrap;
 }
 
-.cstatus.on { background: #E4F6EC; color: var(--green); }
-.cstatus.plan { background: #E7F0FB; color: var(--blue2); }
-.cstatus.dev { background: #FCF2DD; color: var(--amber); }
+.cstatus.on { background: var(--verde-claro); color: var(--green); }
+.cstatus.plan { background: var(--azul-claro); color: var(--blue2); }
+.cstatus.dev { background: var(--amarelo-claro); color: var(--amber); }
 
 /* --- Documentos nas pendencias --- */
 .doc-chip {
   font-size: 11.5px;
-  background: #EEF3FB;
+  background: var(--azul-claro);
   color: var(--blue);
-  border: 1px solid #DBE6F6;
+  border: 1px solid var(--azul-borda);
   padding: 4px 10px;
   border-radius: 20px;
   display: inline-block;
@@ -1289,9 +1339,9 @@ tr:hover td {
 }
 
 .doc-chip.miss {
-  background: #FBE6E6;
+  background: var(--vermelho-claro);
   color: var(--red);
-  border-color: #F3C9C9;
+  border-color: var(--vermelho-borda);
 }
 
 /* --- ASSISTENTE IA --- */
@@ -1332,7 +1382,7 @@ tr:hover td {
 
 .chat-head span {
   font-size: 12px;
-  color: #CBD9F4;
+  color: #C9CEEA;
   display: block;
 }
 
@@ -1343,7 +1393,7 @@ tr:hover td {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  background: #F7FAFE;
+  background: var(--cinza-claro);
 }
 
 .msg {
@@ -1392,9 +1442,9 @@ tr:hover td {
 
 .chip {
   font-size: 12.5px;
-  background: #EEF3FB;
+  background: var(--azul-claro);
   color: var(--blue);
-  border: 1px solid #DBE6F6;
+  border: 1px solid var(--azul-borda);
   padding: 8px 13px;
   border-radius: 20px;
   cursor: pointer;
@@ -1461,7 +1511,7 @@ tr:hover td {
 
 .selo-ia.basico {
   background: rgba(255, 255, 255, .12);
-  color: #CBD9F4;
+  color: #C9CEEA;
   cursor: help;
 }
 
@@ -1507,23 +1557,23 @@ tr:hover td {
 /* --- Rodape de total nas tabelas --- */
 tfoot td {
   font-weight: 700;
-  background: #F2F6FB;
+  background: var(--cinza-claro);
   border-top: 2px solid var(--line);
 }
 
 /* --- ENVIO DE PLANILHA --- */
 .upload {
-  border: 2px dashed #C7D6EC;
+  border: 2px dashed var(--azul-borda);
   border-radius: 14px;
   padding: 28px 20px;
   text-align: center;
-  background: #FAFCFF;
+  background: var(--cinza-claro);
   transition: .15s;
 }
 
 .upload:hover {
   border-color: var(--blue2);
-  background: #F4F8FD;
+  background: var(--cinza-claro);
 }
 
 .upload .ic {
@@ -1564,14 +1614,17 @@ tfoot td {
 }
 
 .btn-enviar:hover {
-  background: var(--navy);
+  background: var(--blue-escuro);
 }
 
-/* --- Mensagem verde de sucesso --- */
+/* --- Mensagem verde de sucesso ---
+   A faixa da esquerda usa o Green Leaf puro da paleta; o texto usa a
+   versao escurecida, que e legivel. */
 .sucesso {
-  background: #E4F6EC;
-  border: 1px solid #B9E3CA;
-  color: #14663A;
+  background: var(--verde-claro);
+  border: 1px solid var(--verde-borda);
+  border-left: 4px solid var(--green-leaf);
+  color: var(--green);
   border-radius: 10px;
   padding: 14px 16px;
   margin-bottom: 16px;
@@ -1586,9 +1639,9 @@ tfoot td {
 
 /* --- Lista de avisos da leitura da planilha --- */
 .erro-lista {
-  background: #FFF8E8;
-  border: 1px solid #F0DCA8;
-  color: #8A6B14;
+  background: var(--amarelo-claro);
+  border: 1px solid var(--amarelo-borda);
+  color: var(--amber);
   border-radius: 10px;
   padding: 14px 16px;
   margin-bottom: 16px;
@@ -1607,7 +1660,7 @@ tfoot td {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 12px 16px;
-  background: #FAFCFF;
+  background: var(--cinza-claro);
 }
 
 .ajuda summary {
@@ -1631,7 +1684,7 @@ tfoot td {
 
 .ajuda code,
 code {
-  background: #EEF2F8;
+  background: var(--linha-suave);
   border-radius: 4px;
   padding: 1px 6px;
   font-size: 12px;
@@ -1647,16 +1700,16 @@ code {
   justify-content: space-between;
   gap: 18px;
   flex-wrap: wrap;
-  border: 1px solid #F0DCA8;
-  background: #FFF8E8;
+  border: 1px solid var(--amarelo-borda);
+  background: var(--amarelo-claro);
   border-radius: 12px;
   padding: 16px 18px;
   margin-bottom: 18px;
 }
 
 .interruptor.ligado {
-  border-color: #B9E3CA;
-  background: #E4F6EC;
+  border-color: var(--verde-borda);
+  background: var(--verde-claro);
 }
 
 .interruptor .texto {
@@ -1664,11 +1717,11 @@ code {
   min-width: 260px;
   font-size: 13px;
   line-height: 1.6;
-  color: #8A6B14;
+  color: var(--amber);
 }
 
 .interruptor.ligado .texto {
-  color: #14663A;
+  color: var(--green);
 }
 
 /* Formulario em linha, usado nos filtros e no cadastro */
@@ -1717,7 +1770,7 @@ code {
 /* Botao de acao destrutiva (remover, bloquear) */
 .act-btn.perigo {
   color: var(--red);
-  border-color: #F3C9C9;
+  border-color: var(--vermelho-borda);
 }
 
 .act-btn.perigo:hover {
@@ -1733,7 +1786,7 @@ code {
   line-height: 1.6;
   margin: 14px 0;
   padding: 10px 14px;
-  background: #F7FAFE;
+  background: var(--cinza-claro);
   border-radius: 8px;
 }
 
@@ -1757,7 +1810,7 @@ code {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.6;
-  background: #FAFCFF;
+  background: var(--cinza-claro);
 }
 
 .nao-implementado .ic {

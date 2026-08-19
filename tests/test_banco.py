@@ -201,11 +201,15 @@ verificar(
 # ---------------------------------------------------------------
 print("\n5. Tabela login_history")
 
-# A tabela deve existir e comecar vazia: ela so enche quando alguem
-# realmente fizer login (isso e a Fase 3).
+# A tabela existe e enche sozinha conforme as pessoas entram no sistema.
+#
+# NAO conferimos aqui se ela esta vazia: se voce tiver usado o site antes
+# de rodar o teste, ja havera acessos gravados — e isso e o certo, nao um
+# defeito. O que importa e que a tabela funcione, o que testamos logo
+# abaixo gravando e apagando um registro.
 total_logins = db.query(LoginHistory).count()
 verificar("a tabela existe e pode ser consultada", total_logins >= 0)
-verificar("comeca vazia (ninguem logou ainda)", total_logins == 0, f"encontrados: {total_logins}")
+print(f"           (ha {total_logins} acesso(s) registrado(s) no momento)")
 
 # Testa gravar e apagar um registro, para provar que a tabela funciona.
 registro = LoginHistory(
