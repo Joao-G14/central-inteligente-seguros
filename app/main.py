@@ -35,7 +35,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app import api, assistente, assistente_ia, auth, config, planilha, seed
+from app import api, assistente, assistente_ia, auth, config, ia_local, planilha, seed
 from app.database import PASTA_RAIZ, get_db
 from app.menu import MENU, buscar_modulo
 from app.models import (
@@ -79,6 +79,20 @@ async def ao_ligar_e_desligar(app: FastAPI):
             # Nao derrubamos o servidor por causa disso: avisamos alto e
             # deixamos o site subir, senao fica impossivel diagnosticar.
             print(f">> ERRO ao preparar o banco: {erro}")
+
+    # Treina a IA agora, enquanto o servidor esta subindo. Se deixassemos
+    # para depois, a PRIMEIRA pergunta de alguem demoraria uns 2 segundos
+    # a mais. Aqui esse tempo entra na inicializacao, que ninguem espera.
+    try:
+        if ia_local.preparar():
+            info = ia_local.informacoes()
+            print(f">> IA local pronta: {info['assuntos']} assuntos, "
+                  f"{info['exemplos']} exemplos de treino.")
+        else:
+            print(f">> IA local indisponivel ({ia_local.informacoes()['erro']}). "
+                  f"O assistente vai usar palavras-chave.")
+    except Exception as erro:
+        print(f">> ERRO ao treinar a IA local: {erro}")
 
     yield  # daqui em diante o site esta no ar
 
@@ -1541,8 +1555,9 @@ def tela_assistente(
             "assist",
             sugestoes=assistente.SUGESTOES,
             conversa=_conversa_de(db, email),
-            # a tela mostra um selo diferente conforme o motor em uso
+            # o selo no topo mostra qual motor esta respondendo
             usando_ia=assistente_ia.esta_disponivel(),
+            ia_local=ia_local.informacoes(),
         ),
     )
 

@@ -20,6 +20,8 @@
         <span>
           {% if usando_ia %}
             Consulta a carteira e responde em linguagem natural
+          {% elif ia_local.disponivel %}
+            Modelo treinado aqui mesmo · {{ ia_local.assuntos }} assuntos
           {% else %}
             Modo básico — responde por palavras-chave
           {% endif %}
@@ -28,9 +30,14 @@
 
       {# Selo indicando qual motor está respondendo #}
       {% if usando_ia %}
-        <span class="selo-ia">IA ativa</span>
+        <span class="selo-ia" title="Claude, pela API da Anthropic">IA na nuvem</span>
+      {% elif ia_local.disponivel %}
+        <span class="selo-ia"
+              title="Modelo de aprendizado de máquina treinado neste servidor, com {{ ia_local.exemplos }} exemplos. Funciona sem internet.">
+          IA local
+        </span>
       {% else %}
-        <span class="selo-ia basico" title="Configure ANTHROPIC_API_KEY no .env para ativar a IA">
+        <span class="selo-ia basico" title="Instale scikit-learn para ativar a IA local">
           Modo básico
         </span>
       {% endif %}
@@ -53,6 +60,10 @@
           {% if usando_ia %}
             Posso consultar a carteira, comparar números e explicar os termos do
             seguro. Pergunte do jeito que preferir.
+          {% elif ia_local.disponivel %}
+            Posso consultar a carteira, explicar os termos do seguro e ensinar
+            como usar cada tela do sistema. Pode escrever do seu jeito — eu
+            entendo abreviação e erro de digitação.
           {% else %}
             Posso consultar <b>apólices, renovações, sinistros, inadimplência,
             comissões e pendências</b>, e explicar os termos do seguro.
@@ -87,13 +98,20 @@
     </form>
   </div>
 
-  {% if not usando_ia %}
+  {% if not usando_ia and ia_local.disponivel %}
+    <p class="dica" style="max-width:900px;margin:14px auto 0">
+      🧠 <b>IA local ativa.</b> Um modelo de aprendizado de máquina treinado
+      neste servidor, com <b>{{ ia_local.exemplos }} exemplos</b> cobrindo
+      <b>{{ ia_local.assuntos }} assuntos</b>. Roda sem internet, sem custo por
+      pergunta e sem os dados saírem daqui.<br>
+      Para ensinar algo novo, acrescente exemplos em
+      <code>app/ia_treino.py</code> e reinicie o servidor.
+    </p>
+  {% elif not usando_ia %}
     <p class="dica" style="max-width:900px;margin:14px auto 0">
       💡 <b>Modo básico ativo.</b> O assistente está respondendo por
-      palavras-chave. Para ativar a inteligência artificial, crie uma chave
-      em <code>console.anthropic.com</code> e adicione
-      <code>ANTHROPIC_API_KEY=...</code> ao arquivo <code>.env</code>.
-      Veja o <b>README.md</b> para o passo a passo.
+      palavras-chave. Para ativar a IA local, instale o scikit-learn:
+      <code>pip install -r requirements.txt</code>.
     </p>
   {% endif %}
 

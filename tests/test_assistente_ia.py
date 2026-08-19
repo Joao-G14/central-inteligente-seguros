@@ -239,11 +239,20 @@ else:
               resposta.get("origem") == "regras",
               f"origem: {resposta.get('origem')}")
 
-    r = cliente.get("/assistente")
-    verificar("  a tela avisa que está em modo básico", "Modo básico" in r.text)
-    verificar("  e ensina como ativar a IA", "ANTHROPIC_API_KEY" in r.text)
+    # Sem a chave da Anthropic, quem responde e a IA LOCAL — o modelo de
+    # aprendizado de maquina treinado no proprio servidor.
+    from app import ia_local  # noqa: E402
 
-    # O modo básico continua respondendo bem.
+    r = cliente.get("/assistente")
+    if ia_local.esta_disponivel():
+        verificar("  a tela avisa que a IA local esta ativa", "IA local" in r.text)
+        verificar("  e explica como ensinar coisas novas a ela",
+                  "ia_treino.py" in r.text)
+    else:
+        verificar("  a tela avisa que está em modo básico", "Modo básico" in r.text)
+        verificar("  e ensina como ativar a IA", "scikit-learn" in r.text)
+
+    # Com ou sem a IA local, o assistente continua respondendo bem.
     for pergunta_teste, esperado in [
         ("olá, tudo bem?", "assistente"),
         ("o que é capital segurado?", "seguradora paga"),

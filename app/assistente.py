@@ -23,6 +23,7 @@ from datetime import date
 
 from sqlalchemy import func
 
+from app import ia_local
 from app.models import Claim, Commission, Delinquency, Payment, Pendency, Policy, Proposal
 
 
@@ -258,6 +259,135 @@ def _esteira(db) -> str:
     if recusadas:
         texto += f"<br>Foram recusadas <b>{len(recusadas)}</b> proposta(s)."
     return texto
+
+
+def _apolices_por_status(db) -> str:
+    """Quantas apolices existem em cada situacao."""
+    por_status = (
+        db.query(Policy.status, func.count(Policy.id))
+        .group_by(Policy.status)
+        .order_by(func.count(Policy.id).desc())
+        .all()
+    )
+    if not por_status:
+        return "Não há apólices cadastradas."
+
+    total = sum(q for _, q in por_status)
+    linhas = "".join(
+        f"<tr><td>{s}</td><td>{q}</td><td>{q * 100 / total:.0f}%</td></tr>"
+        for s, q in por_status
+    )
+    return (
+        f"A carteira tem <b>{total} apólices</b>, assim distribuídas:"
+        f"<table><tr><th>Situação</th><th>Qtd.</th><th>%</th></tr>{linhas}</table>"
+    )
+
+
+def _premio_total(db) -> str:
+    ativas = db.query(Policy).filter(Policy.status == "Ativa").count()
+    premio = db.query(func.sum(Policy.premio_mensal)).filter(
+        Policy.status == "Ativa"
+    ).scalar() or 0
+
+    if not ativas:
+        return "Não há apólices ativas para somar o prêmio."
+
+    return (
+        f"O <b>prêmio mensal</b> das apólices ativas soma "
+        f"<b>{_reais(premio)}</b>, vindos de <b>{ativas} apólices</b>.<br><br>"
+        f"Isso dá uma média de <b>{_reais(premio / ativas)}</b> por apólice, "
+        f"e cerca de <b>{_reais(premio * 12)}</b> por ano."
+    )
+
+
+def _vidas_cobertas(db) -> str:
+    """
+    Uma "vida coberta" e cada cobertura ativa. Quem tem Morte + Invalidez
+    conta duas vezes, porque sao dois riscos cobertos.
+    """
+    ativas = db.query(Policy).filter(Policy.status == "Ativa").count()
+    if not ativas:
+        return "Não há apólices ativas no momento."
+
+    com_morte = db.query(Policy).filter(
+        Policy.status == "Ativa", Policy.capital_morte > 0
+    ).count()
+    com_invalidez = db.query(Policy).filter(
+        Policy.status == "Ativa", Policy.capital_invalidez > 0
+    ).count()
+
+    return (
+        f"São <b>{ativas} participantes</b> com apólice ativa, somando "
+        f"<b>{com_morte + com_invalidez} vidas cobertas</b>.<br><br>"
+        f"O número de vidas é maior porque cada cobertura conta uma vez:"
+        f"<table><tr><th>Cobertura</th><th>Participantes</th></tr>"
+        f"<tr><td>Morte</td><td>{com_morte}</td></tr>"
+        f"<tr><td>Invalidez</td><td>{com_invalidez}</td></tr></table>"
+        f"Quem tem <b>Morte + Invalidez</b> aparece nas duas linhas."
+    )
+
+
+def _convenios(db) -> str:
+    from app.models import Agreement, Invoice
+
+    convenios = db.query(Agreement).order_by(Agreement.nome).all()
+    if not convenios:
+        return "Não há convênios cadastrados."
+
+    a_emitir = db.query(Invoice).filter(Invoice.status == "A emitir").all()
+    emitidos = db.query(Invoice).filter(Invoice.status != "A emitir").all()
+
+    linhas = ""
+    for c in convenios:
+        boleto = next((b for b in a_emitir if b.agreement_id == c.id), None)
+        if boleto:
+            linhas += (
+                f"<tr><td>{c.nome}</td><td>{boleto.vidas:,}</td>"
+                f"<td>{_reais(boleto.valor, 0)}</td></tr>"
+            ).replace(",", ".")
+
+    total = sum(b.valor for b in a_emitir)
+    em_aberto = sum(1 for b in emitidos if b.status == "Em aberto")
+
+    # A primeira frase explica o CONCEITO, e depois vem a lista. Assim a
+    # mesma resposta serve tanto para "o que sao convenios?" quanto para
+    # "quais sao os convenios?" — duas perguntas que as pessoas fazem do
+    # mesmo jeito e que so uma palavra separa.
+    texto = (
+        f"Convênios são as <b>entidades parceiras</b> cujos associados "
+        f"participam do seguro. Os boletos saem separados por convênio.<br><br>"
+        f"Hoje são <b>{len(convenios)}</b>. Na competência atual, aguardando "
+        f"emissão:"
+        f"<table><tr><th>Convênio</th><th>Vidas</th><th>Valor</th></tr>"
+        f"{linhas}</table>"
+        f"Total a emitir: <b>{_reais(total, 0)}</b>."
+    )
+    if em_aberto:
+        texto += f"<br><br>⚠️ Há <b>{em_aberto} boleto(s) em aberto</b> de competências anteriores."
+    return texto
+
+
+def _buscar_apolice(db) -> str:
+    """
+    Quando alguem pede uma apolice especifica sem dizer qual.
+
+    Se a pergunta trouxer um numero (AP-2041) ou um nome, quem trata
+    disso e a funcao responder(), que passa a busca ja pronta. Aqui e
+    o caso de nao ter vindo nenhuma pista.
+    """
+    total = db.query(Policy).count()
+    exemplo = db.query(Policy).order_by(Policy.data_vencimento).first()
+    dica = f"<b>{exemplo.numero_apolice}</b>" if exemplo else "AP-0000"
+
+    return (
+        f"Claro! A carteira tem <b>{total} apólices</b>. "
+        f"Me diga <b>o número</b> ou <b>o nome do participante</b> que eu "
+        f"busco para você.<br><br>"
+        f"Por exemplo: <i>“me mostra a apólice {dica}”</i> ou "
+        f"<i>“procura a apólice do Marcos”</i>.<br><br>"
+        f"Você também pode usar a busca da tela <b>Gestão de Seguros</b>, "
+        f"que filtra a tabela enquanto você digita."
+    )
 
 
 def _apolices_carteira(db) -> str:
@@ -536,6 +666,222 @@ def _sobre_api(_db) -> str:
     )
 
 
+def _sistema_telas(_db) -> str:
+    return (
+        "O sistema tem <b>12 telas</b>, no menu da esquerda:<br><br>"
+        "<table>"
+        "<tr><th>Tela</th><th>Para que serve</th></tr>"
+        "<tr><td><b>Dashboard</b></td><td>os números da carteira e os últimos acessos</td></tr>"
+        "<tr><td><b>Ramos / Produtos</b></td><td>o ramo que opera hoje e o roadmap</td></tr>"
+        "<tr><td><b>Integrações</b></td><td>a API e as conexões previstas</td></tr>"
+        "<tr><td><b>Gestão de Seguros</b></td><td>a carteira de apólices, com busca</td></tr>"
+        "<tr><td><b>Esteira</b></td><td>as propostas, em 4 colunas</td></tr>"
+        "<tr><td><b>Movimentação &amp; Pgto.</b></td><td>envio de planilha, convênios e boletos</td></tr>"
+        "<tr><td><b>Comissões</b></td><td>a divisão 10% / 15% / 75%</td></tr>"
+        "<tr><td><b>Inadimplência</b></td><td>a régua de cobrança e os devedores</td></tr>"
+        "<tr><td><b>Sinistros</b></td><td>os processos em andamento</td></tr>"
+        "<tr><td><b>Pendências</b></td><td>o que falta resolver</td></tr>"
+        "<tr><td><b>Assistente</b></td><td>onde estamos conversando agora</td></tr>"
+        "<tr><td><b>Controle de Acesso</b></td><td>quem pode entrar (só o estipulante)</td></tr>"
+        "</table>"
+        "Itens com 🔒 são os que o seu perfil não acessa."
+    )
+
+
+def _sistema_login(_db) -> str:
+    return (
+        "<b>Como entrar no sistema</b><br><br>"
+        "Você escolhe o <b>tipo de acesso</b> (Estipulante, Corretora ou "
+        "Seguradora), digita <b>o seu e-mail</b> e a <b>senha daquela "
+        "categoria</b>.<br><br>"
+        "O e-mail é livre — ele não precisa estar cadastrado. Serve para "
+        "registrar quem entrou, com data, hora e IP.<br><br>"
+        "<b>Se não conseguir entrar</b>, confira nesta ordem:<br>"
+        "1. o tipo de acesso selecionado é o certo? A senha de uma categoria "
+        "não funciona em outra.<br>"
+        "2. o e-mail está num formato válido?<br>"
+        "3. se a lista de acesso estiver ligada, o seu e-mail precisa estar "
+        "autorizado.<br><br>"
+        "<b>Trocar a senha:</b> ela fica no arquivo <code>.env</code> do "
+        "servidor. Como é compartilhada por categoria, trocá-la afeta todo "
+        "mundo daquele grupo. Quem administra isso é o estipulante."
+    )
+
+
+def _sistema_permissoes(_db) -> str:
+    return (
+        "Cada categoria enxerga uma parte do sistema:<br><br>"
+        "<table>"
+        "<tr><th>Categoria</th><th>Não acessa</th></tr>"
+        "<tr><td><b>Estipulante</b></td><td>— (vê tudo)</td></tr>"
+        "<tr><td><b>Corretora</b></td><td>Sinistros e Controle de Acesso</td></tr>"
+        "<tr><td><b>Seguradora</b></td><td>Comissões, Inadimplência e Controle de Acesso</td></tr>"
+        "</table>"
+        "Se um item aparece com 🔒, é porque o seu perfil não tem acesso a ele."
+        "<br><br>A trava é no <b>servidor</b>, não só no menu: digitar o "
+        "endereço direto na barra do navegador também é barrado, e você volta "
+        "para o Dashboard."
+    )
+
+
+def _sistema_controle_acesso(_db) -> str:
+    return (
+        "<b>Controle de Acesso</b> — no menu, só o estipulante enxerga.<br><br>"
+        "A tela tem duas partes:<br><br>"
+        "<b>1. Lista de acesso autorizado</b><br>"
+        "Cadastre um e-mail específico (<code>joao@empresa.com.br</code>) ou "
+        "um domínio inteiro (<code>@empresa.com.br</code>, que libera a "
+        "empresa toda de uma vez). Dá para limitar a autorização a uma "
+        "categoria, bloquear, reativar e remover.<br><br>"
+        "Um interruptor liga a <b>exigência da lista</b>. Com ela ligada, "
+        "entrar passa a exigir duas coisas: estar cadastrado <b>e</b> saber a "
+        "senha da categoria.<br><br>"
+        "<b>2. Histórico de acessos</b><br>"
+        "Toda tentativa de entrada, com data, hora, IP e o motivo da recusa. "
+        "Dá para filtrar e exportar para Excel. Na linha de quem você não "
+        "reconhecer, há um botão que bloqueia o e-mail na hora."
+    )
+
+
+def _sistema_exportar(_db) -> str:
+    return (
+        "Quatro telas têm o botão <b>⬇ Exportar Excel</b>:<br><br>"
+        "• Movimentação &amp; Pagamento<br>"
+        "• Inadimplência<br>"
+        "• Pendências<br>"
+        "• Controle de Acesso (o histórico)<br><br>"
+        "O arquivo baixado é um <code>.csv</code>, que abre direto no Excel. "
+        "Ele já vem no padrão brasileiro: ponto e vírgula separando as "
+        "colunas e vírgula no decimal, então os acentos e os valores "
+        "aparecem certos sem precisar configurar nada."
+    )
+
+
+def _sistema_boleto(db) -> str:
+    from app.models import Invoice
+
+    a_emitir = db.query(Invoice).filter(Invoice.status == "A emitir").count()
+    return (
+        "Em <b>Movimentação &amp; Pagamento</b>, no painel "
+        "<b>Emissão de boletos por convênio</b>, cada convênio aparece num "
+        "cartão com as vidas, as movimentações e o total.<br><br>"
+        "Ao clicar em <b>Emitir boleto</b>:<br>"
+        "• o boleto sai dos cartões e vai para a tabela “Boletos emitidos”<br>"
+        "• o status muda de <i>A emitir</i> para <i>Em aberto</i><br>"
+        "• o vencimento é definido para 10 dias depois<br><br>"
+        f"Neste momento há <b>{a_emitir} boleto(s)</b> aguardando emissão."
+    )
+
+
+def _sistema_cobrar(db) -> str:
+    from app.models import Delinquency
+
+    pendentes = db.query(Delinquency).filter(
+        Delinquency.cobranca_enviada.is_(False)
+    ).count()
+    return (
+        "Na tela de <b>Inadimplência</b>, cada participante em atraso tem um "
+        "botão <b>Cobrar</b>. Ao clicar, o registro fica marcado como "
+        "“✓ Cobrança enviada” e o botão é desativado, para não cobrar duas "
+        "vezes sem querer.<br><br>"
+        f"Hoje há <b>{pendentes} participante(s)</b> ainda sem cobrança enviada."
+        "<br><br>⚠️ <b>Importante:</b> o botão registra a cobrança no sistema, "
+        "mas <b>não dispara e-mail</b>. O envio de verdade ainda não foi "
+        "implementado — quem cobra é uma pessoa, olhando essa marcação."
+    )
+
+
+def _sistema_pendencia_resolver(db) -> str:
+    from app.models import Pendency
+
+    abertas = db.query(Pendency).filter(Pendency.resolvida.is_(False)).count()
+    return (
+        "Na tela de <b>Pendências</b>, cada linha tem o botão "
+        "<b>Marcar resolvida</b>. Ao clicar, a pendência sai da lista de "
+        "abertas e vai para o painel <b>Pendências resolvidas</b>, logo "
+        "abaixo — onde existe um botão <b>Reabrir</b>, caso tenha sido "
+        "engano.<br><br>"
+        f"Há <b>{abertas} pendência(s)</b> em aberto agora.<br><br>"
+        "A ordem da lista é por prioridade (Alta, Média, Baixa) e, dentro de "
+        "cada uma, pelo prazo mais próximo."
+    )
+
+
+def _sistema_busca(_db) -> str:
+    return (
+        "Cinco telas têm um campo <b>Buscar</b> no canto superior direito do "
+        "painel: Gestão de Seguros, Movimentação, Esteira, Sinistros e "
+        "Controle de Acesso.<br><br>"
+        "A busca filtra <b>enquanto você digita</b>, sem recarregar a página, "
+        "e procura em <b>todas as colunas</b> ao mesmo tempo — dá para "
+        "procurar por nome, CPF, número da apólice ou qualquer texto da "
+        "linha. Maiúsculas e minúsculas não fazem diferença.<br><br>"
+        "Se nada for encontrado, aparece um aviso no lugar das linhas."
+    )
+
+
+def _sistema_dados(db) -> str:
+    from app.models import Payment, Policy
+
+    apolices = db.query(Policy).count()
+    pagamentos = db.query(Payment).count()
+    return (
+        "<b>Onde ficam os dados</b><br><br>"
+        "Tudo fica num banco de dados <b>SQLite</b>, que é um único arquivo "
+        "em <code>database/central.db</code>, dentro do próprio servidor. "
+        "Ele <b>não vai para o GitHub</b>.<br><br>"
+        "<b>Como os dados chegam:</b><br>"
+        "• pela <b>planilha .xlsx</b>, enviada em Movimentação &amp; Pagamento<br>"
+        "• pela <b>API</b>, quando um sistema parceiro envia<br>"
+        "• pelo comando de instalação, que carrega os dados de demonstração<br><br>"
+        f"Neste momento há <b>{apolices} apólices</b> e <b>{pagamentos} "
+        f"registros de movimentação</b>.<br><br>"
+        "⚠️ Os dados de demonstração são <b>fictícios</b>. Quando a base real "
+        "entrar, o sistema pode ser configurado para subir vazio, sem nenhum "
+        "registro inventado."
+    )
+
+
+def _sistema_tecnologia(_db) -> str:
+    return (
+        "O sistema foi feito com:<br><br>"
+        "<table>"
+        "<tr><th>O quê</th><th>Para quê</th></tr>"
+        "<tr><td><b>Python</b> + <b>FastAPI</b></td><td>o servidor e as rotas</td></tr>"
+        "<tr><td><b>SQLite</b> + <b>SQLAlchemy</b></td><td>o banco de dados</td></tr>"
+        "<tr><td><b>Jinja2</b></td><td>monta o HTML com os dados</td></tr>"
+        "<tr><td><b>HTML / CSS / JavaScript</b></td><td>a interface</td></tr>"
+        "<tr><td><b>bcrypt</b></td><td>protege as senhas</td></tr>"
+        "<tr><td><b>openpyxl</b></td><td>lê a planilha enviada</td></tr>"
+        "<tr><td><b>scikit-learn</b></td><td>o meu cérebro 🙂</td></tr>"
+        "</table>"
+        "As cores seguem a <b>paleta oficial do Sebrae Previdência</b>. Todo "
+        "o código está comentado em português, para quem estiver aprendendo."
+    )
+
+
+def _sistema_assistente(_db) -> str:
+    from app import ia_local
+
+    info = ia_local.informacoes()
+    return (
+        "<b>Como eu funciono</b><br><br>"
+        "Eu não sou o ChatGPT nem estou ligado à internet. Sou um modelo de "
+        "<b>aprendizado de máquina</b> treinado <b>aqui mesmo</b>, neste "
+        f"servidor, com <b>{info['exemplos']} perguntas de exemplo</b> "
+        f"cobrindo <b>{info['assuntos']} assuntos</b>.<br><br>"
+        "Funciona assim:<br>"
+        "1. eu classifico o <b>assunto</b> da sua pergunta<br>"
+        "2. consulto o <b>banco de dados</b> na hora<br>"
+        "3. monto a resposta com os números que encontrei<br><br>"
+        "Por isso <b>eu não invento dados</b>: todo número que eu digo veio "
+        "de uma consulta feita agora. E se eu não tiver certeza do assunto, "
+        "prefiro dizer que não entendi a chutar.<br><br>"
+        "Como aprendi por padrões, e não por palavras exatas, eu entendo "
+        "erros de digitação e jeitos diferentes de perguntar a mesma coisa."
+    )
+
+
 def _sobre_central(_db) -> str:
     return (
         "A <b>Central Inteligente de Seguros</b> reúne em um só lugar a operação "
@@ -673,13 +1019,101 @@ def _recusar(assunto: str) -> str:
     )
 
 
+# ===============================================================
+# O MAPA: cada assunto e a funcao que responde por ele
+# ===============================================================
+# Os nomes aqui precisam ser IGUAIS aos de app/ia_treino.py. Se voce
+# criar um assunto novo lá, crie a resposta aqui — senão o assistente
+# reconhece a pergunta mas não sabe o que dizer.
+RESPOSTAS = {
+    # --- conversa ---
+    "cumprimento": _cumprimento,
+    "apresentacao": _apresentacao,
+    "agradecimento": _agradecimento,
+    "despedida": _despedida,
+    "ajuda": _ajuda,
+
+    # --- dados da carteira ---
+    "carteira_resumo": _apolices_carteira,
+    "apolices_por_status": _apolices_por_status,
+    "renovacoes": _renovacoes,
+    "capital_segurado": _capital,
+    "premio_total": _premio_total,
+    "buscar_apolice": _buscar_apolice,
+    "vidas_cobertas": _vidas_cobertas,
+    "sinistros": _sinistros,
+    "inadimplencia": _inadimplencia,
+    "comissoes": _comissoes,
+    "pagamentos": _pagamentos,
+    "propostas": _esteira,
+    "pendencias": _pendencias,
+    "convenios": _convenios,
+
+    # --- sobre o proprio site ---
+    "sistema_o_que_e": _sobre_central,
+    "sistema_telas": _sistema_telas,
+    "sistema_login": _sistema_login,
+    "sistema_permissoes": _sistema_permissoes,
+    "sistema_controle_acesso": _sistema_controle_acesso,
+    "sistema_planilha": _como_enviar_planilha,
+    "sistema_exportar": _sistema_exportar,
+    "sistema_boleto": _sistema_boleto,
+    "sistema_cobrar": _sistema_cobrar,
+    "sistema_pendencia_resolver": _sistema_pendencia_resolver,
+    "sistema_busca": _sistema_busca,
+    "sistema_api": _sobre_api,
+    "sistema_dados": _sistema_dados,
+    "sistema_tecnologia": _sistema_tecnologia,
+    "sistema_assistente": _sistema_assistente,
+}
+
+# --- os conceitos do seguro ---
+# Em vez de repetir os textos, apontamos cada assunto para o item
+# correspondente da lista GLOSSARIO, procurando por uma palavra-chave.
+#
+# Fazemos por NOME, e nao por posicao na lista: assim, se alguem
+# reordenar o glossario, nada troca de lugar.
+_CONCEITOS = {
+    "conceito_apolice": "apolice",
+    "conceito_premio": "premio",
+    "conceito_capital": "capital segurado",
+    "conceito_sinistro": "sinistro",
+    "conceito_dps": "dps",
+    "conceito_carencia": "carencia",
+    "conceito_beneficiario": "beneficiario",
+    "conceito_estipulante": "estipulante",
+    "conceito_corretora": "corretora",
+    "conceito_seguradora": "seguradora",
+    "conceito_subscricao": "subscricao",
+    "conceito_cobertura": "invalidez",
+    "conceito_competencia": "competencia",
+    "conceito_convenio": "convenio",
+    "conceito_regua": "regua de cobranca",
+    "conceito_ramo": "ramo",
+}
+
+
+def _buscar_no_glossario(palavra_chave: str):
+    """Acha o item do glossario que tem esta palavra-chave."""
+    for palavras, titulo, explicacao in GLOSSARIO:
+        if palavra_chave in palavras:
+            return _responder_glossario(titulo, explicacao)
+    return None
+
+
+for _assunto, _palavra in _CONCEITOS.items():
+    _resposta = _buscar_no_glossario(_palavra)
+    if _resposta is not None:
+        RESPOSTAS[_assunto] = _resposta
+
+
 SUGESTOES = [
     "Olá, tudo bem?",
-    "O que você faz?",
+    "Como você funciona?",
     "Quais apólices vencem este mês?",
     "O que é capital segurado?",
     "Quem está inadimplente?",
-    "Como envio a planilha?",
+    "Quais telas o sistema tem?",
 ]
 
 RESPOSTA_PADRAO = (
@@ -710,18 +1144,42 @@ def responder(db, pergunta: str) -> str:
     # Espacos nas pontas ajudam a encontrar palavras no comeco e no fim.
     texto = " " + _sem_acento(pergunta).strip() + " "
 
-    # 2. Fora do assunto — conferido ANTES das regras.
+    # -----------------------------------------------------------
+    # 2. A pergunta cita uma apolice, um sinistro ou uma proposta?
+    # -----------------------------------------------------------
+    # Isto vem antes de tudo porque e muito especifico: se a pessoa
+    # escreveu "AP-2041", ela quer AQUELA apolice, nao uma explicacao.
+    especifico = _buscar_registro_citado(db, pergunta)
+    if especifico:
+        return especifico
+
+    # -----------------------------------------------------------
+    # 3. Fora do assunto
+    # -----------------------------------------------------------
     for palavras, assunto in FORA_DO_ASSUNTO:
         if _alguma(texto, palavras):
             # Excecao: se a pergunta TAMBEM fala de algo nosso, ela e
             # nossa. "quanto e a comissao?" tem "quanto e", mas e sobre
-            # comissao — entao deixamos as regras normais responderem.
+            # comissao — entao seguimos adiante.
             if not _fala_de_seguros(texto):
                 return _recusar(assunto)
 
-    # 3. As regras, na ordem certa.
-    #    Conversa e sistema vem sempre primeiro. Depois, o glossario e o
-    #    banco trocam de lugar conforme o tipo da pergunta.
+    # -----------------------------------------------------------
+    # 4. O MODELO DE APRENDIZADO DE MAQUINA
+    # -----------------------------------------------------------
+    # Ele olha a pergunta inteira e diz de que assunto ela trata.
+    # Entende erro de digitacao e jeitos diferentes de perguntar.
+    assunto, _confianca = ia_local.classificar(pergunta)
+
+    if assunto and assunto in RESPOSTAS:
+        return RESPOSTAS[assunto](db)
+
+    # -----------------------------------------------------------
+    # 5. PLANO B: as palavras-chave
+    # -----------------------------------------------------------
+    # Se o modelo ficou em duvida, ainda tentamos pelo jeito antigo.
+    # Ele e mais limitado, mas as vezes pega um caso que o modelo nao
+    # reconheceu — e nao custa nada tentar.
     if _quer_uma_definicao(texto):
         ordem = REGRAS_CONVERSA + REGRAS_SISTEMA + REGRAS_CONCEITOS + REGRAS_DADOS
     else:
@@ -731,8 +1189,121 @@ def responder(db, pergunta: str) -> str:
         if _alguma(texto, palavras_chave):
             return funcao(db)
 
-    # 4. Nao reconheceu
+    # -----------------------------------------------------------
+    # 6. Nao reconheceu
+    # -----------------------------------------------------------
     return RESPOSTA_PADRAO
+
+
+# ===============================================================
+# BUSCA DE UM REGISTRO ESPECIFICO CITADO NA PERGUNTA
+# ===============================================================
+# Codigos que reconhecemos no meio do texto.
+_CODIGO_APOLICE = re.compile(r"\bap[\s\-]?(\d{3,5})\b", re.IGNORECASE)
+_CODIGO_SINISTRO = re.compile(r"\bsin[\s\-]?(\d{3,5})\b", re.IGNORECASE)
+_CODIGO_PROPOSTA = re.compile(r"\bprop[\s\-]?(\d{3,5})\b", re.IGNORECASE)
+
+
+def _buscar_registro_citado(db, pergunta: str) -> str | None:
+    """
+    Se a pergunta citar um codigo (AP-2041, SIN-0448, PROP-3012),
+    devolve os dados daquele registro. Senao, devolve None.
+    """
+    texto = pergunta or ""
+
+    achado = _CODIGO_APOLICE.search(texto)
+    if achado:
+        return _detalhe_apolice(db, f"AP-{achado.group(1)}")
+
+    achado = _CODIGO_SINISTRO.search(texto)
+    if achado:
+        return _detalhe_sinistro(db, f"SIN-{achado.group(1).zfill(4)}")
+
+    achado = _CODIGO_PROPOSTA.search(texto)
+    if achado:
+        return _detalhe_proposta(db, f"PROP-{achado.group(1)}")
+
+    return None
+
+
+def _detalhe_apolice(db, numero: str) -> str:
+    apolice = db.query(Policy).filter(Policy.numero_apolice == numero).first()
+    if apolice is None:
+        return (
+            f"Não encontrei a apólice <b>{numero}</b> na carteira. "
+            f"Confira o número — ele tem o formato <b>AP-0000</b>."
+        )
+
+    dias = apolice.dias_para_vencer()
+    if dias < 0:
+        prazo = f"venceu há {abs(dias)} dia(s)"
+    elif dias == 0:
+        prazo = "vence hoje"
+    else:
+        prazo = f"vence em {dias} dia(s)"
+
+    return (
+        f"<b>Apólice {apolice.numero_apolice}</b><br><br>"
+        f"<table>"
+        f"<tr><td>Participante</td><td><b>{apolice.participante}</b></td></tr>"
+        f"<tr><td>Cobertura</td><td>{apolice.cobertura}</td></tr>"
+        f"<tr><td>Capital segurado</td><td>{_reais(apolice.capital_total, 0)}</td></tr>"
+        f"<tr><td>Prêmio mensal</td><td>{_reais(apolice.premio_mensal)}</td></tr>"
+        f"<tr><td>Vigência</td><td>{apolice.data_inicio.strftime('%d/%m/%Y')} "
+        f"a {apolice.data_vencimento.strftime('%d/%m/%Y')}</td></tr>"
+        f"<tr><td>Situação</td><td><b>{apolice.status}</b> — {prazo}</td></tr>"
+        f"</table>"
+    )
+
+
+def _detalhe_sinistro(db, protocolo: str) -> str:
+    sinistro = db.query(Claim).filter(Claim.protocolo == protocolo).first()
+    if sinistro is None:
+        return (
+            f"Não encontrei o sinistro <b>{protocolo}</b>. "
+            f"O formato do protocolo é <b>SIN-0000</b>."
+        )
+
+    alerta = "" if sinistro.documentacao_ok else "<br><br>⚠️ Este processo está parado por falta de documento."
+    return (
+        f"<b>Sinistro {sinistro.protocolo}</b><br><br>"
+        f"<table>"
+        f"<tr><td>Participante</td><td><b>{sinistro.participante}</b></td></tr>"
+        f"<tr><td>Tipo</td><td>{sinistro.tipo}</td></tr>"
+        f"<tr><td>Aberto em</td><td>{sinistro.data_abertura.strftime('%d/%m/%Y')} "
+        f"({sinistro.dias_em_aberto()} dias)</td></tr>"
+        f"<tr><td>Documentação</td><td>{sinistro.documentacao}</td></tr>"
+        f"<tr><td>Situação</td><td><b>{sinistro.status}</b></td></tr>"
+        f"</table>{alerta}"
+    )
+
+
+def _detalhe_proposta(db, numero: str) -> str:
+    proposta = db.query(Proposal).filter(Proposal.numero == numero).first()
+    if proposta is None:
+        return (
+            f"Não encontrei a proposta <b>{numero}</b>. "
+            f"O formato é <b>PROP-0000</b>."
+        )
+
+    etapas = {
+        "recebida": "Proposta recebida",
+        "analise": "Em análise (subscrição)",
+        "aceita": "Aceita — aguardando emissão",
+        "pendente": "Pendente",
+    }
+    situacao = "Recusada" if proposta.recusada else etapas.get(proposta.etapa, proposta.etapa)
+
+    linhas = f"<tr><td>Participante</td><td><b>{proposta.participante}</b></td></tr>"
+    if proposta.cobertura:
+        linhas += f"<tr><td>Cobertura</td><td>{proposta.cobertura}</td></tr>"
+    if proposta.capital:
+        linhas += f"<tr><td>Capital</td><td>{_reais(proposta.capital, 0)}</td></tr>"
+    linhas += f"<tr><td>Etapa</td><td><b>{situacao}</b></td></tr>"
+    if proposta.observacao:
+        linhas += f"<tr><td>Observação</td><td>{proposta.observacao}</td></tr>"
+
+    return f"<b>Proposta {proposta.numero}</b><br><br><table>{linhas}</table>"
 
 
 # Palavras que provam que a pergunta e do nosso mundo, mesmo que ela

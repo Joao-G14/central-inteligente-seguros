@@ -245,41 +245,79 @@ comentado no proprio CSS.
 
 ### Sobre o Assistente
 
-Ele tem **dois motores**, e escolhe sozinho qual usar:
+Ele tem **tres motores** e escolhe sozinho, nesta ordem:
 
-| Motor | Arquivo | Quando roda |
-|---|---|---|
-| **IA de verdade** (Claude Opus 5) | `app/assistente_ia.py` | quando ha uma `ANTHROPIC_API_KEY` no `.env` |
-| **Palavras-chave** | `app/assistente.py` | sem chave, ou se a IA falhar |
+| # | Motor | Arquivo | Quando roda |
+|---|---|---|---|
+| 1 | **IA na nuvem** (Claude) | `app/assistente_ia.py` | se houver `ANTHROPIC_API_KEY` no `.env` |
+| 2 | **IA local** (nossa) | `app/ia_local.py` | sempre que o scikit-learn estiver instalado |
+| 3 | Palavras-chave | `app/assistente.py` | se os dois acima falharem |
 
-Com a IA ligada, ele entende qualquer jeito de perguntar, conversa,
-compara numeros e lembra do que foi dito antes. A IA nao tem acesso
-direto ao banco: ela usa **8 ferramentas** que apenas LEEM
-(apolices, sinistros, inadimplencia, comissoes, pagamentos, pendencias,
-propostas e o resumo da carteira). Ela nao consegue alterar nem apagar nada.
+Ninguem fica sem resposta: se um motor falha, o seguinte assume.
 
-Sem a chave, o modo por palavras-chave assume e ninguem fica sem resposta.
+#### A IA local — treinada aqui mesmo
 
-A conversa fica guardada por pessoa (tabela `chat_messages`) e ha um
-botao **Limpar** para recomecar.
+E um **modelo de aprendizado de maquina** treinado no proprio servidor,
+sem internet, sem custo por pergunta e sem os dados sairem daqui — o que
+importa para a LGPD.
 
-#### Como ligar a IA
+**Como funciona, em 3 passos:**
 
-1. crie uma conta em https://console.anthropic.com
-2. gere uma chave de API
-3. coloque no arquivo `.env`:
+1. **TF-IDF** transforma a frase em numeros, quebrando de dois jeitos ao
+   mesmo tempo: por letras (2 a 5 seguidas), o que tolera erro de
+   digitacao, e por palavras (1 ou 2), o que pega expressoes como
+   "capital segurado" como uma coisa so.
+2. Uma **Regressao Logistica** aprende, a partir dos exemplos, quais
+   pedacos indicam cada assunto. Ninguem escreve "se tem a palavra X
+   entao e Y" — ela deduz sozinha.
+3. Ela responde o assunto **e o quanto esta confiante**. Abaixo de 28%
+   de confianca, prefere dizer que nao entendeu a chutar.
+
+Por isso ela entende `"kuantas apolice a gente tem?"` sem que essa frase
+exista em lugar nenhum do codigo.
+
+**O que ela cobre:** 50 assuntos — os dados da carteira, os conceitos do
+seguro (apolice, premio, DPS, carencia, subscricao...) e **como usar cada
+tela do sistema** (login, permissoes, envio de planilha, exportacao,
+emissao de boleto, busca, API).
+
+Ela tambem reconhece codigos citados no meio da pergunta: escreva
+`AP-2041`, `SIN-0448` ou `PROP-3012` e ela traz aquele registro.
+
+**Ensinar algo novo** — leva 2 minutos:
+
+1. abra `app/ia_treino.py`
+2. ache o assunto (ou crie um novo)
+3. acrescente 3 ou 4 jeitos diferentes de perguntar aquilo
+4. se criou um assunto novo, crie a resposta em `app/assistente.py`
+5. reinicie o servidor — ele treina sozinho ao ligar, em ~2 segundos
+
+Vale escrever errado de proposito e usar giria: e assim que as pessoas
+digitam.
+
+> **O que ela NAO e:** um modelo de linguagem como o ChatGPT. Ela nao
+> escreve textos novos nem raciocina em varias etapas. Ela reconhece o
+> assunto e busca a resposta no banco — que e o que este sistema precisa.
+
+#### A IA na nuvem (opcional)
+
+Com uma `ANTHROPIC_API_KEY` no `.env`, o assistente passa a usar o
+**Claude Opus 5**. Ele conversa de verdade, compara numeros e lembra do
+contexto. Nao tem acesso direto ao banco: usa **8 ferramentas** que
+apenas LEEM.
 
 ```
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-4. reinicie o servidor
+Crie a chave em https://console.anthropic.com. Cada pergunta custa
+fracoes de centavo.
 
-O selo no topo da conversa mostra qual motor esta ativo: **IA ativa** ou
-**Modo basico**.
+O selo no topo da conversa mostra qual motor esta ativo: **IA na nuvem**,
+**IA local** ou **Modo basico**.
 
-> Cada pergunta a IA tem um custo (fracoes de centavo). Confira os precos
-> atuais no site da Anthropic.
+A conversa fica guardada por pessoa (tabela `chat_messages`) e ha um
+botao **Limpar** para recomecar.
 
 ---
 
