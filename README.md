@@ -14,14 +14,17 @@ Baseada no prototipo navegavel do Programa Prev IA — 1o Ciclo.
 
 | O que | Para que serve |
 |---|---|
-| Python 3.14 | linguagem de programacao |
+| Python 3.12+ | linguagem de programacao |
 | FastAPI | cria as paginas e rotas do site |
 | Uvicorn | servidor que coloca o site no ar |
 | Jinja2 | monta o HTML com dados do banco |
 | SQLAlchemy | conversa com o banco de dados |
 | SQLite | o banco de dados (um arquivo local) |
 | bcrypt | protege as senhas com hash |
-| HTML / CSS / JavaScript | a interface (vinda do prototipo) |
+| itsdangerous | assina o cookie de sessao do login |
+| openpyxl | le a planilha .xlsx enviada pela tela |
+| anthropic | o assistente com inteligencia artificial (opcional) |
+| HTML / CSS / JavaScript | a interface |
 
 ---
 
@@ -29,16 +32,33 @@ Baseada no prototipo navegavel do Programa Prev IA — 1o Ciclo.
 
 ```
 central-inteligente-seguros/
-├── app/           # o codigo Python da aplicacao
-├── templates/     # as paginas HTML
-├── static/        # CSS, JavaScript e imagens
-├── database/      # o arquivo central.db (nao vai para o GitHub)
-├── sql/           # script para recriar o banco do zero
-├── prototipo/     # o prototipo HTML original, intacto (referencia visual)
-├── docs/          # documentacao do projeto (PRD, planilha, diagrama)
-├── tests/         # testes
-├── venv/          # ambiente virtual Python (nao vai para o GitHub)
+├── app/                  # o codigo Python da aplicacao
+│   ├── main.py           # as rotas: cada endereco do site
+│   ├── database.py       # conexao com o banco
+│   ├── models.py         # as 14 tabelas
+│   ├── auth.py           # senha, login, sessao e permissoes
+│   ├── config.py         # le o arquivo .env
+│   ├── menu.py           # os itens do menu lateral
+│   ├── seed.py           # cria e popula o banco
+│   ├── planilha.py       # le a planilha .xlsx enviada
+│   ├── api.py            # a API para sistemas parceiros
+│   ├── assistente.py     # assistente por palavras-chave
+│   └── assistente_ia.py  # assistente com IA (Claude)
+├── templates/            # as paginas HTML
+├── static/
+│   ├── css/style.css     # a folha de estilo, com a paleta oficial
+│   ├── js/main.js        # avisos de carregamento e busca nas tabelas
+│   └── img/              # logo e favicon
+├── database/             # o arquivo central.db (nao vai para o GitHub)
+├── sql/banco.sql         # script para recriar o banco do zero
+├── prototipo/            # o prototipo HTML original, intacto
+├── docs/                 # documentacao do projeto
+├── tests/                # 6 arquivos de teste
+├── venv/                 # ambiente virtual (nao vai para o GitHub)
 ├── requirements.txt
+├── render.yaml           # receita de publicacao no servidor
+├── DEPLOY.md             # guia para colocar no ar
+├── .env.example          # modelo de configuracao
 ├── .gitignore
 └── README.md
 ```
@@ -80,8 +100,13 @@ o seu, com um comando so:
 python -m app.seed
 ```
 
-Isso cria as 3 tabelas e preenche com os dados ficticios (3 usuarios e
-50 apolices). Pode rodar quantas vezes quiser — ele sempre refaz do zero.
+Isso cria as 14 tabelas e preenche com os dados de demonstracao
+(3 categorias de acesso e 100 apolices). Pode rodar quantas vezes
+quiser — ele sempre refaz do zero.
+
+> Na pratica voce quase nunca precisa deste comando: o sistema cria o
+> banco sozinho ao ligar, se ele nao existir. Use o `seed` quando quiser
+> **apagar tudo e comecar do zero**.
 
 Para conferir se deu tudo certo:
 
@@ -89,7 +114,7 @@ Para conferir se deu tudo certo:
 python tests\test_banco.py
 ```
 
-Devem aparecer 49 verificacoes com `[OK]`.
+Devem aparecer 48 verificacoes com `[OK]`.
 
 > Alternativa: se preferir criar o banco pelo SQL puro, use
 > `sqlite3 database/central.db < sql/banco.sql`. O arquivo `sql/banco.sql`
@@ -113,12 +138,15 @@ Serve para desenvolver; em producao nao se usa.
 ### Rodar todos os testes
 
 ```powershell
-python tests\test_banco.py     # 49 verificacoes — banco e dados
-python tests\test_login.py     # 49 verificacoes — login e permissoes
-python tests\test_modulos.py   # 93 verificacoes — as 11 telas
+python tests\test_banco.py          # 48 — banco e dados
+python tests\test_login.py          # 49 — login e permissoes
+python tests\test_modulos.py        # 94 — as telas dos modulos
+python tests\test_novidades.py      # 61 — planilha e API
+python tests\test_acessos.py        # 77 — controle de acesso e assistente
+python tests\test_assistente_ia.py  # 48 — a IA e a memoria da conversa
 ```
 
-Total: **191 verificacoes**. Nao precisa estar com o servidor ligado —
+Total: **377 verificacoes**. Nao precisa estar com o servidor ligado —
 os testes sobem a aplicacao por dentro.
 
 Rode sempre depois de mexer no codigo. Se aparecer `[FALHOU]`, a linha
@@ -128,32 +156,77 @@ diz exatamente o que quebrou.
 
 ## As telas do sistema
 
-Todas as 11 telas do prototipo estao funcionando, lendo dados do banco.
+As 12 telas funcionam, lendo dados do banco.
 
 | Endereco | Tela | O que mostra |
 |---|---|---|
-| `/login` | Entrada | 3 perfis, e-mail e senha |
+| `/login` | Entrada | 3 categorias, e-mail e senha |
 | `/dashboard` | Dashboard | numeros da carteira + ultimos acessos |
 | `/produtos` | Ramos / Produtos | ramo ativo (numeros reais) + roadmap |
-| `/integracoes` | Integracoes (API) | como os dados chegam, hoje e no futuro |
-| `/seguros` | Gestao de Seguros | 50 apolices, com busca |
+| `/integracoes` | Integracoes (API) | os enderecos da API e o roadmap |
+| `/seguros` | Gestao de Seguros | 100 apolices, com busca |
 | `/esteira` | Esteira de Apolices | quadro de propostas em 4 colunas |
-| `/movimentacao` | Movimentacao & Pgto. | 10 segurados, convenios e boletos |
+| `/movimentacao` | Movimentacao & Pgto. | envio de planilha, convenios e boletos |
 | `/comissoes` | Painel de Comissoes | divisao 10/15/75% + historico |
 | `/inadimplencia` | Inadimplencia | regua de cobranca e devedores |
 | `/sinistros` | Sinistros | sinistros em andamento |
 | `/pendencias` | Pendencias | o que falta resolver |
 | `/assistente` | Assistente | perguntas respondidas com o banco |
+| `/acessos` | Controle de Acesso | quem pode entrar e quem ja entrou |
+| `/docs` | Documentacao da API | pagina automatica, da para testar por ali |
 
 ### Coisas que realmente funcionam (nao sao so telas)
 
+- **Enviar planilha `.xlsx`** — le, valida linha por linha e grava. A
+  planilha substitui a competencia inteira, entao reenviar uma versao
+  corrigida nao duplica nada. Se houver erro, o banco nem e tocado.
 - **Emitir boleto** — muda o status no banco e define o vencimento
 - **Cobrar inadimplente** — marca a cobranca como enviada
 - **Resolver / reabrir pendencia** — muda a situacao no banco
+- **Autorizar e bloquear acesso** — pela tela de Controle de Acesso
 - **Exportar Excel** — baixa um `.csv` de verdade (movimentacao,
-  inadimplencia e pendencias), ja no formato do Excel brasileiro
+  inadimplencia, pendencias e historico de acessos), ja no formato do
+  Excel brasileiro
 - **Busca nas tabelas** — filtra sem recarregar a pagina
 - **Assistente** — consulta o banco na hora para responder
+- **API de integracao** — 9 enderecos para sistemas parceiros
+
+### A API de integracao
+
+Serve para outros sistemas (corretora, seguradora) buscarem e enviarem
+dados sem ninguem digitar. A documentacao automatica fica em **`/docs`**,
+e da para testar cada endereco por ali mesmo.
+
+| Metodo | Endereco | O que faz |
+|---|---|---|
+| GET | `/api/v1/status` | confere se a Central esta no ar |
+| GET | `/api/v1/indicadores` | numeros consolidados da carteira |
+| GET | `/api/v1/apolices` | lista apolices (filtra por status e vencimento) |
+| GET | `/api/v1/apolices/{numero}` | busca uma apolice |
+| GET | `/api/v1/movimentacao` | movimentacao de uma competencia |
+| GET | `/api/v1/sinistros` | sinistros em andamento |
+| GET | `/api/v1/comissoes` | comissoes por competencia |
+| GET | `/api/v1/inadimplencia` | participantes em atraso |
+| POST | `/api/v1/movimentacao` | **recebe** a base da corretora |
+
+Todo pedido precisa enviar o cabecalho `X-API-Key` com a chave definida
+no `.env`. Sem ela, a resposta e 401.
+
+> A conexao **com** ICATU, corretora e Trust Prev nao depende de
+> programacao nossa: depende de esses sistemas publicarem uma API,
+> liberarem credenciais e passarem pela homologacao de seguranca.
+
+### Identidade visual
+
+O site usa a **paleta oficial do Sebrae Previdencia**. As 9 cores estao
+no topo do `static/css/style.css` com o nome oficial de cada uma —
+trocar ali muda o site inteiro.
+
+Tres cores (Green Leaf, Gray Steel e Sky Cloud) tem contraste abaixo do
+minimo legivel quando usadas como texto sobre branco. Elas continuam
+sendo usadas como **preenchimento** (barras, bordas, bolinhas), e o
+arquivo define versoes escurecidas so para texto. O motivo esta
+comentado no proprio CSS.
 
 ### Sobre o Assistente
 
@@ -195,30 +268,60 @@ O selo no topo da conversa mostra qual motor esta ativo: **IA ativa** ou
 
 ---
 
-## Usuarios de teste
+## Como funciona o acesso
 
-Todos ficticios, apenas para desenvolvimento:
+O login e por **CATEGORIA**, nao por usuario individual. Cada categoria
+tem a sua senha, compartilhada por todas as pessoas daquela categoria:
 
-| E-mail | Senha | Perfil |
-|---|---|---|
-| `estipulante@sebraeprev.com.br` | `estipulante@sebraeprev` | ESTIPULANTE |
-| `corretora@sebraeprev.com.br` | `corretora@sebraeprev` | CORRETORA |
-| `seguradora@sebraeprev.com.br` | `seguradora@sebraeprev` | SEGURADORA |
+| Categoria | Senha (definida no `.env`) |
+|---|---|
+| ESTIPULANTE | `SENHA_ESTIPULANTE` |
+| CORRETORA | `SENHA_CORRETORA` |
+| SEGURADORA | `SENHA_SEGURADORA` |
+
+O **e-mail e livre**: serve para identificar quem entrou e fica gravado
+no historico com data, hora e IP.
 
 As senhas ficam no arquivo `.env` (que nao vai para o GitHub). Use o
-`.env.example` como modelo para criar o seu.
+`.env.example` como modelo. No banco elas sao guardadas como
+**hash bcrypt** — nunca em texto puro.
 
-No banco, as senhas sao guardadas como **hash bcrypt** — nunca em texto puro.
+### Controle de Acesso (so o estipulante)
+
+A tela `/acessos` tem duas partes:
+
+**Lista de acesso autorizado** — cadastre e-mails especificos
+(`joao@empresa.com.br`) ou dominios inteiros (`@empresa.com.br`, libera
+a empresa toda). Da para bloquear, reativar e remover.
+
+Um interruptor liga a **exigencia da lista**. Com ela ligada, entrar
+exige duas coisas: estar cadastrado **e** saber a senha da categoria.
+Ela comeca desligada, com o dominio `@sebraeprev.com.br` ja cadastrado,
+para ligar a exigencia nao travar o acesso de ninguem.
+
+**Historico de acessos** — toda tentativa, com filtros por e-mail,
+categoria e resultado, e exportacao em CSV.
+
+> **Limitacao conhecida:** como a senha e compartilhada e o e-mail nao e
+> conferido, o registro de quem acessou depende da boa-fe de quem digita.
+> Se um dia for preciso auditoria a prova de contestacao, o caminho e
+> voltar ao login individual por pessoa — o campo `email` da tabela
+> `users` ja esta preparado para isso.
 
 ---
 
 ## As tabelas do banco
 
+São **14 tabelas**:
+
 | Tabela | O que guarda |
 |---|---|
-| `users` | quem pode entrar: nome, e-mail, hash da senha, perfil |
-| `login_history` | cada tentativa de acesso: quem, quando, de qual IP, deu certo ou nao |
-| `policies` | a carteira de apolices (50 registros) |
+| `users` | as 3 categorias de acesso e a senha de cada uma |
+| `authorized_emails` | quem pode entrar (e-mails e dominios liberados) |
+| `settings` | configuracoes que o estipulante liga pela tela |
+| `login_history` | cada tentativa de acesso: quem, quando, de qual IP |
+| `chat_messages` | a conversa de cada pessoa com o assistente |
+| `policies` | a carteira de apolices (100 registros) |
 | `payments` | movimentacao mensal por segurado (10 registros) |
 | `agreements` | os 4 convenios (FENACON, OPBB, CORECON, FenaSebrae) |
 | `invoices` | boletos por convenio e competencia (8 registros) |
@@ -232,7 +335,17 @@ Os dados das apolices vieram de 3 origens, marcadas na coluna `origem`:
 
 - `prototipo` — as 8 apolices que aparecem na tela do prototipo HTML
 - `planilha` — os 10 segurados da `Base_Segurados_Central.xlsx`
-- `gerado` — 32 apolices geradas para dar volume a carteira
+- `gerado` — 82 apolices geradas para dar volume a carteira
+
+Para mudar a quantidade, altere `TOTAL_APOLICES` no `app/seed.py`.
+Os testes leem essa constante, entao nada quebra.
+
+### Subir o sistema VAZIO (para uso real)
+
+No `.env`, troque `CARREGAR_DADOS_DEMO=sim` por **`nao`** e apague o
+`database/central.db`. O sistema sobe so com as categorias de acesso,
+sem nenhuma apolice inventada — a carteira entra pela planilha ou pela
+API. Isso so vale para um banco novo; dados existentes nunca sao apagados.
 
 ### Como o status da apolice e calculado
 
@@ -258,9 +371,16 @@ mesmos status da tela original — hoje e daqui a anos.
 
 | Perfil | O que pode ver |
 |---|---|
-| **ESTIPULANTE** | tudo |
-| **CORRETORA** | tudo, **exceto** Sinistros |
-| **SEGURADORA** | tudo, **exceto** Comissoes e Inadimplencia |
+| **ESTIPULANTE** | tudo, inclusive o Controle de Acesso |
+| **CORRETORA** | tudo, **exceto** Sinistros e Controle de Acesso |
+| **SEGURADORA** | tudo, **exceto** Comissoes, Inadimplencia e Controle de Acesso |
+
+As regras ficam em `MODULOS_BLOQUEADOS`, no `app/auth.py` — uma lista
+por perfil do que ele **nao** pode acessar.
+
+A trava e no **servidor**, nao so no menu: digitar o endereco na barra
+do navegador tambem e barrado. Esconder o item do menu sozinho nao
+protege nada.
 
 ---
 
