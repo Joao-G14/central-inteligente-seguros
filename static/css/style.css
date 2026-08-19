@@ -43,14 +43,33 @@
      Abaixo damos um "cargo" para cada cor. Se um dia a marca mudar,
      basta trocar as 9 cores acima e o site inteiro acompanha.
      ---------------------------------------------------------------- */
-  --navy: var(--navy-sea);       /* topo do menu lateral        */
-  --blue: var(--blue-prev);      /* botoes, links, destaques    */
-  --blue-escuro: var(--dark-indigo); /* botao pressionado/hover */
+  --navy: var(--navy-sea);       /* menu lateral, areas escuras */
+  --blue: var(--blue-prev);      /* links, numeros, acentos     */
+  --blue-escuro: var(--navy-sea);/* botao pressionado/hover     */
   --blue2: var(--sky-cloud);     /* avatares, foco, graficos    */
   --bg: var(--white-moon);       /* fundo das paginas           */
   --card: #FFFFFF;               /* fundo dos cartoes           */
   --ink: var(--black-screen);    /* cor do texto                */
-  --rosa: var(--pink-face);      /* realces suaves              */
+
+  /* ----------------------------------------------------------------
+     POR QUE AS AREAS GRANDES USAM NAVY SEA E NAO BLUE PREV
+     ----------------------------------------------------------------
+     Na roda de cores, o azul puro fica em 240 graus e o roxo em 270.
+     Quanto mais perto de 270, mais roxo o olho enxerga.
+
+        Blue Prev   239 graus  -> azul, mas puxando para o roxo
+        Navy Sea    222 graus  -> azul limpo
+        Sky Cloud   201 graus  -> azul claro
+
+     O Blue Prev e a cor primaria da marca, e continua sendo usado no
+     logo, nos links, nos numeros e nos acentos. Mas quando ele pinta
+     uma AREA GRANDE (o menu lateral inteiro, um botao cheio), aquela
+     inclinacao para o roxo fica evidente e o site parece roxo.
+
+     Por isso as superficies grandes usam Navy Sea. As duas sao cores
+     oficiais da paleta — muda so a proporcao entre elas.
+     ---------------------------------------------------------------- */
+  --superficie: var(--navy-sea); /* menu, botoes, baloes de conversa */
 
   /* ----------------------------------------------------------------
      TONS DERIVADOS — e o motivo de cada um
@@ -247,7 +266,7 @@ body.tela-login {
 
 .btn-entrar {
   width: 100%;
-  background: var(--blue);
+  background: var(--superficie);
   color: #fff;
   border: none;
   border-radius: 9px;
@@ -313,7 +332,7 @@ body.tela-login {
 
 /* --- Menu lateral --- */
 .side {
-  background: linear-gradient(180deg, var(--navy), var(--blue));
+  background: linear-gradient(180deg, var(--navy-sea), #0C2E7A);
   color: #fff;
   padding: 22px 16px;
   position: sticky;
@@ -543,7 +562,7 @@ body.tela-login {
   font-size: 28px;
   font-weight: 800;
   margin-top: 8px;
-  color: var(--blue);
+  color: var(--navy-sea);
 }
 
 .kpi .delta {
@@ -751,9 +770,9 @@ tr:hover td {
    Usa o Pink Face da paleta como fundo, com texto Navy Sea por cima
    para garantir contraste. */
 .ia-tag {
-  background: var(--pink-face);
+  background: var(--azul-claro);
   color: var(--navy);
-  border: 1px solid #E2C2D3;
+  border: 1px solid var(--azul-borda);
   font-size: 10.5px;
   font-weight: 700;
   padding: 2px 8px;
@@ -779,7 +798,7 @@ tr:hover td {
 
 .exp-btn:hover,
 .act-btn:hover {
-  background: var(--blue);
+  background: var(--superficie);
   color: #fff;
   border-color: var(--blue);
 }
@@ -950,7 +969,7 @@ tr:hover td {
 .comm .amt {
   font-size: 26px;
   font-weight: 800;
-  color: var(--blue);
+  color: var(--navy-sea);
   margin: 10px 0 4px;
 }
 
@@ -970,7 +989,7 @@ tr:hover td {
 .comm .prog i {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, var(--blue), var(--sky));
+  background: linear-gradient(90deg, var(--navy-sea), var(--sky-cloud));
   border-radius: 20px;
 }
 
@@ -1005,7 +1024,7 @@ tr:hover td {
 .rstep .rn {
   font-size: 24px;
   font-weight: 800;
-  color: var(--blue);
+  color: var(--navy-sea);
   margin: 6px 0 4px;
 }
 
@@ -1035,7 +1054,7 @@ tr:hover td {
 .conv h4 {
   font-size: 15px;
   font-weight: 700;
-  color: var(--blue);
+  color: var(--navy-sea);
 }
 
 .conv .cd {
@@ -1068,7 +1087,7 @@ tr:hover td {
 
 .conv .tot b {
   font-size: 16px;
-  color: var(--blue);
+  color: var(--navy-sea);
 }
 
 .conv form {
@@ -1077,7 +1096,7 @@ tr:hover td {
 
 .conv button {
   width: 100%;
-  background: var(--blue);
+  background: var(--superficie);
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -1413,7 +1432,7 @@ tr:hover td {
 }
 
 .msg.me {
-  background: var(--blue);
+  background: var(--superficie);
   color: #fff;
   border-bottom-right-radius: 4px;
   align-self: flex-end;
@@ -1453,7 +1472,7 @@ tr:hover td {
 }
 
 .chip:hover {
-  background: var(--blue);
+  background: var(--superficie);
   color: #fff;
 }
 
@@ -1478,7 +1497,7 @@ tr:hover td {
 .composer input:focus { border-color: var(--blue2); }
 
 .composer button {
-  background: var(--blue);
+  background: var(--superficie);
   color: #fff;
   border: none;
   border-radius: 24px;
@@ -1602,7 +1621,7 @@ tfoot td {
 }
 
 .btn-enviar {
-  background: var(--blue);
+  background: var(--superficie);
   color: #fff;
   border: none;
   border-radius: 9px;
