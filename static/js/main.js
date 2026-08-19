@@ -1,10 +1,177 @@
 /* ==================================================================
-   main.js — o pouquinho de JavaScript do sistema
+   main.js — o JavaScript do sistema
    ==================================================================
    Quase tudo neste projeto e feito no servidor, com Python e Jinja2.
-   O JavaScript entra so onde algo precisa acontecer SEM recarregar a
-   pagina — por enquanto, apenas a busca da tabela.
+   O JavaScript entra so em tres lugares:
+
+     1. os avisos de carregamento (logo abaixo)
+     2. a busca que filtra tabelas sem recarregar a pagina
+     3. a conversa com o assistente
    ================================================================== */
+
+
+/* ==================================================================
+   1. AVISOS DE CARREGAMENTO
+   ==================================================================
+   O problema: quando voce clica num item do menu, o navegador vai
+   buscar a pagina nova no servidor. Nesse meio-tempo a tela fica
+   parada e parece que o clique nao funcionou.
+
+   A solucao: mostrar tres avisos.
+
+     - uma barra fina correndo no topo
+     - uma bolinha girando dentro do que foi clicado
+     - um cartao no canto, so se a espera passar de meio segundo
+
+   O DETALHE IMPORTANTE: a barra e o cartao so aparecem depois de um
+   atraso. Aqui na sua maquina as paginas abrem em poucos milissegundos;
+   sem esse atraso, os avisos apareceriam e sumiriam num piscar, o que
+   incomoda mais do que ajuda. Com o atraso, em navegacao rapida nada
+   chega a aparecer, e em navegacao lenta o aviso entra na hora certa.
+   ================================================================== */
+
+// Quanto esperar antes de mostrar cada aviso (em milissegundos).
+const ATRASO_DA_BARRA = 120;   // barra do topo
+const ATRASO_DO_CARTAO = 550;  // cartao no canto
+
+let barra = null;
+let cartao = null;
+let cronometroBarra = null;
+let cronometroCartao = null;
+let cronometroSeguranca = null;
+
+/** Cria a barra e o cartao na primeira vez que sao necessarios. */
+function prepararAvisos() {
+  if (!barra) {
+    barra = document.createElement('div');
+    barra.className = 'barra-carregando';
+    document.body.appendChild(barra);
+  }
+  if (!cartao) {
+    cartao = document.createElement('div');
+    cartao.className = 'aviso-carregando';
+    cartao.innerHTML = '<span class="girando"></span><span>Carregando…</span>';
+    document.body.appendChild(cartao);
+  }
+}
+
+/**
+ * Comeca a mostrar que algo esta carregando.
+ *
+ * @param {HTMLElement} elemento  o botao ou link clicado (opcional)
+ */
+function iniciarCarregamento(elemento) {
+  prepararAvisos();
+
+  // A bolinha no elemento clicado aparece na hora: ela e a resposta
+  // imediata ao clique, e nao atrapalha nem se for rapido.
+  if (elemento && !elemento.classList.contains('ocupado')) {
+    elemento.classList.add('ocupado');
+    if (!elemento.querySelector('.girando')) {
+      const bolinha = document.createElement('span');
+      bolinha.className = 'girando';
+      elemento.appendChild(bolinha);
+    }
+  }
+
+  // A barra e o cartao esperam um pouco antes de aparecer.
+  clearTimeout(cronometroBarra);
+  clearTimeout(cronometroCartao);
+
+  cronometroBarra = setTimeout(function () {
+    barra.classList.remove('completa');
+    // Força o navegador a redesenhar antes de animar, senao a barra
+    // pularia direto para 90% sem o efeito de corrida.
+    void barra.offsetWidth;
+    barra.classList.add('ativa');
+  }, ATRASO_DA_BARRA);
+
+  cronometroCartao = setTimeout(function () {
+    cartao.classList.add('ativo');
+  }, ATRASO_DO_CARTAO);
+
+  // Rede de seguranca: se a pagina nao trocar em 20 segundos, algo deu
+  // errado. Escondemos os avisos para a tela nao ficar travada para
+  // sempre com a bolinha girando.
+  clearTimeout(cronometroSeguranca);
+  cronometroSeguranca = setTimeout(encerrarCarregamento, 20000);
+}
+
+/** Encerra os avisos (usado quando a navegacao nao chega a acontecer). */
+function encerrarCarregamento() {
+  clearTimeout(cronometroBarra);
+  clearTimeout(cronometroCartao);
+  clearTimeout(cronometroSeguranca);
+
+  if (cartao) cartao.classList.remove('ativo');
+
+  if (barra && barra.classList.contains('ativa')) {
+    barra.classList.remove('ativa');
+    barra.classList.add('completa');
+    setTimeout(function () { barra.classList.remove('completa'); }, 400);
+  }
+
+  document.querySelectorAll('.ocupado').forEach(function (el) {
+    el.classList.remove('ocupado');
+    const bolinha = el.querySelector('.girando');
+    if (bolinha) bolinha.remove();
+  });
+}
+
+/**
+ * Este link deve disparar o aviso de carregamento?
+ *
+ * Devolve false para os casos em que a pagina NAO vai mudar: downloads,
+ * links para outro site, abrir em nova aba, ancoras (#), e os cliques
+ * com Ctrl/Shift/Cmd, que o navegador abre em outra aba.
+ */
+function linkNavegaDeVerdade(link, evento) {
+  if (!link || !link.href) return false;
+  if (link.hasAttribute('download')) return false;
+  if (link.target && link.target !== '_self') return false;
+  if (evento.ctrlKey || evento.metaKey || evento.shiftKey || evento.altKey) return false;
+  if (evento.button !== 0) return false;  // so o botao esquerdo
+
+  const destino = new URL(link.href, window.location.href);
+  if (destino.origin !== window.location.origin) return false;
+  if (destino.protocol !== 'http:' && destino.protocol !== 'https:') return false;
+
+  // Ancora na mesma pagina (ex.: href="#topo"): nao recarrega nada.
+  if (destino.pathname === window.location.pathname &&
+      destino.search === window.location.search &&
+      destino.hash) return false;
+
+  return true;
+}
+
+// --- Liga tudo assim que a pagina termina de carregar ---
+document.addEventListener('DOMContentLoaded', function () {
+
+  // Cliques em links.
+  document.addEventListener('click', function (evento) {
+    const link = evento.target.closest('a');
+    if (linkNavegaDeVerdade(link, evento)) {
+      iniciarCarregamento(link);
+    }
+  });
+
+  // Envio de formularios (login, filtros, botoes de acao).
+  document.addEventListener('submit', function (evento) {
+    // defaultPrevented = alguem ja tratou este envio por JavaScript
+    // (e o caso da conversa do assistente), entao a pagina nao muda.
+    if (evento.defaultPrevented) return;
+
+    const formulario = evento.target;
+    const botao = formulario.querySelector('button[type="submit"], button:not([type])');
+    iniciarCarregamento(botao || null);
+  });
+});
+
+// Ao voltar pelo botao "voltar" do navegador, a pagina pode vir da
+// memoria com os avisos ainda ligados. Este trecho limpa tudo.
+window.addEventListener('pageshow', function (evento) {
+  if (evento.persisted) encerrarCarregamento();
+});
 
 /**
  * Filtra as linhas de uma tabela conforme o que a pessoa digita.

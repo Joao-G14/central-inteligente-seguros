@@ -151,6 +151,18 @@ body.tela-login {
   border-radius: 16px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, .25);
   padding: 34px 32px 28px;
+  animation: entrar-cartao .35s cubic-bezier(.2, .8, .3, 1);
+}
+
+@keyframes entrar-cartao {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* A marca no login: logo oficial em cima, nome do sistema embaixo. */
@@ -528,6 +540,22 @@ body.tela-login {
 .content {
   padding: 26px 30px;
   overflow: auto;
+  /* A tela entra com um leve deslize e clareada.
+     Isto NAO deixa o sistema mais lento: o conteudo ja esta todo ali,
+     a animacao acontece enquanto voce le. Serve para a troca de tela
+     nao ser um corte seco. */
+  animation: entrar-tela .24s ease-out;
+}
+
+@keyframes entrar-tela {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* ==================================================================
@@ -1807,6 +1835,123 @@ code {
   padding: 10px 14px;
   background: var(--cinza-claro);
   border-radius: 8px;
+}
+
+/* ==================================================================
+   INDICADORES DE CARREGAMENTO
+   ==================================================================
+   Tres avisos que aparecem quando algo esta sendo carregado:
+
+     1. barra fina no topo da tela
+     2. bolinha girando dentro do botao/link que foi clicado
+     3. cartao flutuante, so se a espera passar de meio segundo
+
+   A barra e o cartao so aparecem depois de um pequeno atraso. Se a
+   pagina abrir rapido — o caso normal aqui — nada chega a piscar.
+   ================================================================== */
+
+/* --- 1. Barra no topo --- */
+.barra-carregando {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 0;
+  background: linear-gradient(90deg, var(--navy-sea), var(--sky-cloud));
+  box-shadow: 0 0 8px rgba(26, 152, 218, .6);
+  z-index: 9999;
+  opacity: 0;
+  transition: width .25s ease, opacity .2s ease;
+  pointer-events: none;
+}
+
+.barra-carregando.ativa {
+  opacity: 1;
+  /* Corre ate 90% e para ali. Os ultimos 10% so completam quando a
+     pagina nova chega de verdade — assim a barra nunca "mente"
+     dizendo que terminou antes da hora. */
+  width: 90%;
+  transition: width 8s cubic-bezier(.1, .6, .2, 1), opacity .2s ease;
+}
+
+.barra-carregando.completa {
+  width: 100%;
+  opacity: 0;
+  transition: width .2s ease, opacity .35s ease .15s;
+}
+
+/* --- 2. Bolinha girando --- */
+/* Um circulo com uma borda so, girando sem parar. */
+.girando {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: girar .6s linear infinite;
+  vertical-align: -2px;
+}
+
+@keyframes girar {
+  to { transform: rotate(360deg); }
+}
+
+/* O elemento clicado ganha a bolinha e fica esmaecido, deixando claro
+   que ja foi clicado e que nao adianta clicar de novo. */
+.ocupado {
+  opacity: .72;
+  pointer-events: none;
+}
+
+.ocupado .girando {
+  margin-left: 8px;
+}
+
+/* --- 3. Cartao flutuante (so em esperas longas) --- */
+.aviso-carregando {
+  position: fixed;
+  bottom: 26px;
+  right: 26px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 6px 22px rgba(7, 31, 89, .18);
+  padding: 13px 18px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--navy-sea);
+  z-index: 9998;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity .25s ease, transform .25s ease;
+  pointer-events: none;
+}
+
+.aviso-carregando.ativo {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.aviso-carregando .girando {
+  color: var(--sky-cloud);
+  width: 16px;
+  height: 16px;
+  border-width: 2.5px;
+}
+
+/* Quem configurou o sistema operacional para reduzir animacoes recebe
+   os mesmos avisos, porem com bem menos movimento. */
+@media (prefers-reduced-motion: reduce) {
+  .girando { animation-duration: 1.6s; }
+  .barra-carregando,
+  .aviso-carregando { transition: opacity .2s ease; }
+  /* Sem deslize na entrada das telas: so a mudanca de opacidade. */
+  .content,
+  .login-card { animation: none; }
 }
 
 /* --- Rodape da tela de login --- */
