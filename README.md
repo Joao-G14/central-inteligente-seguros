@@ -216,6 +216,21 @@ no `.env`. Sem ela, a resposta e 401.
 > programacao nossa: depende de esses sistemas publicarem uma API,
 > liberarem credenciais e passarem pela homologacao de seguranca.
 
+#### Conectar ao Microsoft Copilot
+
+Da para criar um agente no Copilot Studio que responde sobre a Central
+usando esta API — as pessoas perguntariam no Teams. O passo a passo esta
+em **[COPILOT-STUDIO.md](COPILOT-STUDIO.md)**.
+
+O arquivo que a Microsoft precisa e gerado por:
+
+```powershell
+python gerar_openapi.py https://seu-endereco-publico
+```
+
+> Exige o sistema **publicado na internet**: o Copilot Studio nao
+> alcanca `127.0.0.1`.
+
 ### Identidade visual
 
 O site usa a **paleta oficial do Sebrae Previdencia**. As 9 cores estao

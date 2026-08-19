@@ -34,3 +34,9 @@ desktop.ini
 
 # ===== Logs =====
 *.log
+
+# ===== Arquivo gerado para o Copilot Studio =====
+# Ele e criado pelo comando "python gerar_openapi.py" e contem o
+# endereco do servidor. Cada pessoa gera o seu quando precisar, entao
+# nao faz sentido versionar.
+openapi-central.json
