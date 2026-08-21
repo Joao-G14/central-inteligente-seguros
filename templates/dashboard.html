@@ -118,6 +118,50 @@
 
   </div>
 
+  {# ---------- CAPITAL SEGURADO MES A MES ----------
+     Vem das fotos guardadas em carteira_snapshots. No primeiro mês
+     aparece uma barra só; o gráfico se preenche sozinho com o tempo. #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Capital segurado por mês</h3>
+        <p>
+          {% if evolucao|length > 1 %}
+            Evolução dos últimos {{ evolucao|length }} meses
+          {% else %}
+            O histórico começou agora — uma foto por mês
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    {% if evolucao %}
+      <div class="bars">
+        {% for mes in evolucao %}
+          <div class="bar-wrap">
+            <div class="bar-val">{{ capital_curto(mes.capital) }}</div>
+            <div class="bar-col">
+              <div class="bar" style="height:{{ mes.altura }}%"
+                   title="{{ mes.competencia }}: {{ mes.ativas }} apólices ativas"></div>
+            </div>
+            <div class="bar-lbl">{{ mes.rotulo }}</div>
+          </div>
+        {% endfor %}
+      </div>
+
+      {% if evolucao|length == 1 %}
+        <p class="dica">
+          📸 O sistema tira uma foto da carteira por mês, sozinho. A cada
+          mês esta barra ganha uma vizinha e dá para ver a tendência.
+          <b>Dado histórico não se cria depois</b> — por isso ele começa a
+          ser guardado desde já.
+        </p>
+      {% endif %}
+    {% else %}
+      <p class="vazio">Nenhuma foto da carteira registrada ainda.</p>
+    {% endif %}
+  </div>
+
   {# ---------- ULTIMOS ACESSOS ----------
      Vem da tabela login_history. E a prova visual de que o sistema esta
      registrando a data e a hora de cada login, como pede o projeto. #}

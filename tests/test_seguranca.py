@@ -104,7 +104,14 @@ ATAQUES = [
 
 db = SessionLocal()
 alvo = db.query(Policy).first()
-original = alvo.participante
+
+# Guardamos os DOIS valores originais, para devolver exatamente como
+# estava. Restaurar um valor "chutado" (por exemplo, assumir que o status
+# era "Ativa") corrompe o banco para os testes seguintes — foi o que
+# aconteceu na primeira versao deste arquivo: a contagem de apolices
+# ativas mudava e o teste do historico falhava sem motivo aparente.
+original_nome = alvo.participante
+original_status = alvo.status
 
 for ataque in ATAQUES:
     alvo.participante = ataque
@@ -137,9 +144,17 @@ resposta = assistente.responder(db, "quais apolices vencem este mes?")
 verificar("  tambem escapa nas listagens", "<script" not in resposta,
           f"vazou em: {resposta[:110]}")
 
-alvo.participante = original
-alvo.status = "Ativa"
+alvo.participante = original_nome
+alvo.status = original_status
 db.commit()
+
+# Confere que devolvemos mesmo como estava. Um teste que estraga o banco
+# faz os proximos falharem por um motivo que nao tem nada a ver com eles,
+# e isso custa horas para descobrir.
+db.refresh(alvo)
+verificar("  o banco voltou ao estado original",
+          alvo.participante == original_nome and alvo.status == original_status,
+          f"ficou: {alvo.participante} / {alvo.status}")
 db.close()
 
 # ---------------------------------------------------------------

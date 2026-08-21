@@ -1940,6 +1940,23 @@ code {
   text-decoration: none;
 }
 
+/* Lista de "campo: antes -> depois" no historico de alteracoes.
+   O <pre> preserva as quebras de linha, entao cada campo alterado
+   aparece na sua propria linha. */
+.alteracoes {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--cinza-claro);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 0;
+  max-width: 420px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* --- Navegacao entre paginas da tabela --- */
 .paginacao {
   display: flex;

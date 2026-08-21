@@ -1,0 +1,222 @@
+{# ==================================================================
+   historico.html — quem mudou o que, e como a carteira estava antes
+   ==================================================================
+   Tela exclusiva do ESTIPULANTE.
+
+   Duas coisas na mesma tela, porque as duas respondem a mesma pergunta:
+   "como estavamos antes?"
+
+     1. as alteracoes feitas nos dados
+     2. a foto da carteira, mes a mes
+   ================================================================== #}
+{% extends "base.html" %}
+
+{% block titulo %}Histórico — Central de Seguros{% endblock %}
+{% block cabecalho %}Histórico{% endblock %}
+{% block subcabecalho %}Alterações feitas nos dados e a evolução da carteira{% endblock %}
+
+{% block conteudo %}
+
+  {# ---------- OS NÚMEROS ---------- #}
+  <div class="kpis">
+    <div class="kpi">
+      <div class="lbl">Alterações registradas</div>
+      <div class="val">{{ total }}</div>
+      <div class="delta">desde o início</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Registros criados</div>
+      <div class="val">{{ por_acao.get('criou', 0) }}</div>
+      <div class="delta up">incluídos pela tela</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Registros editados</div>
+      <div class="val">{{ por_acao.get('alterou', 0) }}</div>
+      <div class="delta warn">● alguém mudou um dado</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Registros excluídos</div>
+      <div class="val">{{ por_acao.get('excluiu', 0) }}</div>
+      <div class="delta {{ 'down' if por_acao.get('excluiu') else '' }}">
+        {{ 'confira o motivo' if por_acao.get('excluiu') else 'nenhum' }}
+      </div>
+    </div>
+  </div>
+
+  {# ==============================================================
+     PARTE 1 — A EVOLUÇÃO DA CARTEIRA
+     ============================================================== #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Evolução da carteira</h3>
+        <p>
+          Uma foto por mês, tirada automaticamente quando o sistema liga
+          {% if fotos|length == 1 %}
+            — esta é a primeira
+          {% endif %}
+        </p>
+      </div>
+      <form method="post" action="/historico/fotografar">
+        <button type="submit" class="exp-btn"
+                title="Atualiza a foto do mês corrente. Os meses anteriores não são alterados.">
+          Atualizar foto deste mês
+        </button>
+      </form>
+    </div>
+
+    {% if fotos|length < 2 %}
+      <div class="dica" style="margin-top:0">
+        📸 <b>O histórico está começando agora.</b> Existe
+        {{ fotos|length }} foto guardada.<br><br>
+        A cada mês o sistema tira uma nova, sozinho. Em alguns meses esta
+        tela vai mostrar a evolução da carteira — e o gráfico de capital
+        por mês no Dashboard vai se preencher junto.<br><br>
+        <b>Dado histórico é a única coisa que não se cria depois:</b> se
+        ninguém tivesse começado a guardar, esses meses estariam perdidos.
+      </div>
+    {% endif %}
+
+    <div class="tabela-rolagem">
+      <table>
+        <thead>
+          <tr>
+            <th>Mês</th>
+            <th class="num">Apólices</th>
+            <th class="num">Ativas</th>
+            <th class="num">A renovar</th>
+            <th class="num">Vencidas</th>
+            <th class="num">Capital segurado</th>
+            <th class="num">Prêmio mensal</th>
+            <th class="num">Vidas</th>
+            <th class="num">Sinistros</th>
+            <th class="num">Em atraso</th>
+            <th>Foto tirada em</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in fotos %}
+            <tr>
+              <td><b>{{ f.competencia }}</b></td>
+              <td class="num">{{ f.apolices_total }}</td>
+              <td class="num">{{ f.apolices_ativas }}</td>
+              <td class="num">{{ f.apolices_a_renovar }}</td>
+              <td class="num">{{ f.apolices_vencidas }}</td>
+              <td class="num">{{ reais(f.capital_segurado, 0) }}</td>
+              <td class="num">{{ reais(f.premio_mensal, 2) }}</td>
+              <td class="num">{{ f.vidas_cobertas }}</td>
+              <td class="num">{{ f.sinistros_abertos }}</td>
+              <td class="num">{{ reais(f.valor_inadimplencia, 2) }}</td>
+              <td>{{ f.data_foto.strftime('%d/%m/%Y %H:%M') }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="11" class="vazio">Nenhuma foto ainda.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {# ==============================================================
+     PARTE 2 — AS ALTERAÇÕES
+     ============================================================== #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Alterações nos dados</h3>
+        <p>
+          Quem criou, editou ou excluiu cada registro
+          {% if total_filtrado != total %}— {{ total_filtrado }} de {{ total }}{% endif %}
+        </p>
+      </div>
+      <a class="exp-btn" href="/historico/exportar" download>⬇ Exportar Excel</a>
+    </div>
+
+    <form method="get" action="/historico" class="form-linha">
+      <div class="campo-linha">
+        <label for="busca">Buscar</label>
+        <input type="search" id="busca" name="busca" value="{{ filtros.busca or '' }}"
+               placeholder="registro, pessoa ou campo alterado…">
+      </div>
+      <div class="campo-linha" style="max-width:180px">
+        <label for="cadastro">Cadastro</label>
+        <select id="cadastro" name="cadastro">
+          <option value="">Todos</option>
+          {% for c in cadastros_existentes %}
+            <option value="{{ c }}" {% if filtros.cadastro == c %}selected{% endif %}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="campo-linha" style="max-width:150px">
+        <label for="acao">Ação</label>
+        <select id="acao" name="acao">
+          <option value="">Todas</option>
+          <option value="criou" {% if filtros.acao == 'criou' %}selected{% endif %}>Criou</option>
+          <option value="alterou" {% if filtros.acao == 'alterou' %}selected{% endif %}>Alterou</option>
+          <option value="excluiu" {% if filtros.acao == 'excluiu' %}selected{% endif %}>Excluiu</option>
+        </select>
+      </div>
+      <button type="submit" class="btn-enviar">Filtrar</button>
+      {% if filtros.busca or filtros.cadastro or filtros.acao %}
+        <a href="/historico" class="exp-btn">Limpar</a>
+      {% endif %}
+    </form>
+
+    <div class="tabela-rolagem">
+      <table>
+        <thead>
+          <tr>
+            <th>Data e hora</th>
+            <th>Ação</th>
+            <th>Cadastro</th>
+            <th>Registro</th>
+            <th>Quem</th>
+            <th>O que mudou</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in registros %}
+            <tr>
+              <td style="white-space:nowrap">{{ r.data_hora.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+              <td><span class="pill {{ r.cor_da_acao() }}">{{ r.acao }}</span></td>
+              <td>{{ r.cadastro }}</td>
+              <td><b>{{ r.identificacao or '—' }}</b></td>
+              <td>
+                {{ r.usuario_email or '—' }}<br>
+                <span style="font-size:11px;color:var(--muted)">{{ r.usuario_perfil or '' }}</span>
+              </td>
+              <td>
+                {% if r.alteracoes %}
+                  {# <pre> preserva as quebras de linha, então cada campo
+                     alterado aparece na sua própria linha. #}
+                  <pre class="alteracoes">{{ r.alteracoes }}</pre>
+                {% else %}
+                  <span style="color:var(--muted)">—</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="6" class="vazio">
+                {% if filtros.busca or filtros.cadastro or filtros.acao %}
+                  Nenhuma alteração encontrada com esses filtros.
+                {% else %}
+                  Nenhuma alteração registrada ainda. Elas aparecem aqui
+                  quando alguém criar, editar ou excluir um registro.
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if registros|length >= limite %}
+      <p class="dica">
+        Mostrando as {{ limite }} alterações mais recentes. Use os filtros
+        para achar registros mais antigos, ou exporte para Excel.
+      </p>
+    {% endif %}
+  </div>
+
+{% endblock %}

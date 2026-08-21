@@ -37,7 +37,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app import (api, assistente, assistente_ia, auth, cadastros, config,
-                 ia_local, planilha, seed, tempo)
+                 historico, ia_local, planilha, seed, tempo)
 from app.database import PASTA_RAIZ, get_db
 from app.menu import MENU, buscar_modulo
 from app.models import (
@@ -48,6 +48,8 @@ from app.models import (
     ApiCall,
     ApiKey,
     AuthorizedEmail,
+    CarteiraSnapshot,
+    ChangeLog,
     ChatMessage,
     Claim,
     Commission,
@@ -112,6 +114,25 @@ async def ao_ligar_e_desligar(app: FastAPI):
             # Nao derrubamos o servidor por causa disso: avisamos alto e
             # deixamos o site subir, senao fica impossivel diagnosticar.
             print(f">> ERRO ao preparar o banco: {erro}")
+
+    # Tira a foto da carteira deste mês, se ainda não existir.
+    #
+    # POR QUE AQUI: dado histórico é a única coisa que não se cria
+    # depois. Se dependesse de alguém rodar um comando todo mês, algum
+    # mês seria esquecido — e aquele mês estaria perdido para sempre.
+    # Fazendo na inicialização, basta o sistema ligar uma vez no mês.
+    try:
+        from app.database import SessionLocal
+
+        db = SessionLocal()
+        try:
+            if historico.garantir_foto_do_mes(db):
+                print(f">> Foto da carteira de {historico.competencia_de_hoje()} "
+                      f"registrada.")
+        finally:
+            db.close()
+    except Exception as erro:
+        print(f">> ERRO ao fotografar a carteira: {erro}")
 
     # Treina a IA agora, enquanto o servidor esta subindo. Se deixassemos
     # para depois, a PRIMEIRA pergunta de alguem demoraria uns 2 segundos
@@ -533,6 +554,11 @@ def dashboard(
     # --- distribuicao por cobertura (o grafico de rosca) ---
     cobertura = montar_grafico_cobertura(db)
 
+    # --- capital segurado mes a mes ---
+    # Vem das fotos guardadas. No primeiro mes ha uma barra só; com o
+    # tempo o grafico se preenche sozinho.
+    evolucao = historico.montar_grafico(db, quantos=6)
+
     # --- ultimos 8 acessos ao sistema ---
     acessos = (
         db.query(LoginHistory)
@@ -552,6 +578,7 @@ def dashboard(
             "kpis": kpis,
             "renovacoes": renovacoes,
             "cobertura": cobertura,
+            "evolucao": evolucao,
             "acessos": acessos,
         },
     )
@@ -1841,8 +1868,18 @@ async def salvar_novo(
     if any(c.nome == "origem" for c in cadastro["campos"]):
         valores["origem"] = "manual"
 
-    db.add(cadastro["modelo"](**valores))
+    novo = cadastro["modelo"](**valores)
+    db.add(novo)
     db.commit()
+
+    # Registra quem criou. Sem isto, não haveria como saber depois quem
+    # incluiu o registro nem o que ele tinha no começo.
+    historico.registrar(
+        db, nome, "criou", usuario, pegar_ip(request),
+        registro_id=novo.id,
+        identificacao=_identificar(cadastro, novo),
+        alteracoes=historico.resumir(valores),
+    )
 
     return RedirectResponse(cadastro["voltar"], status_code=303)
 
@@ -1919,9 +1956,20 @@ async def salvar_edicao(
     if cadastro.get("calcular"):
         valores = cadastro["calcular"](valores)
 
+    # Guarda como estava ANTES de mexer. É isso que permite dizer depois
+    # "o capital foi de 250.000 para 300.000" em vez de só "alguém mexeu".
+    antes = historico.estado_atual(registro, list(valores.keys()))
+
     for chave, valor in valores.items():
         setattr(registro, chave, valor)
     db.commit()
+
+    historico.registrar(
+        db, nome, "alterou", usuario, pegar_ip(request),
+        registro_id=registro.id,
+        identificacao=_identificar(cadastro, registro),
+        alteracoes=historico.comparar(antes, valores),
+    )
 
     return RedirectResponse(cadastro["voltar"], status_code=303)
 
@@ -1930,10 +1978,11 @@ async def salvar_edicao(
 def excluir_registro(
     nome: str,
     registro_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     usuario: User | None = Depends(exigir_login),
 ):
-    """Apaga o registro."""
+    """Apaga o registro — mas guarda o rastro de que ele existiu."""
     cadastro, fora = _abrir_cadastro(usuario, nome)
     if fora:
         return fora
@@ -1941,11 +1990,148 @@ def excluir_registro(
     registro = db.query(cadastro["modelo"]).filter(
         cadastro["modelo"].id == registro_id
     ).first()
+
     if registro is not None:
+        # Guardamos o conteúdo ANTES de apagar. Este é o caso em que o
+        # registro de alterações mais importa: depois do delete, o dado
+        # não existe em nenhum outro lugar.
+        campos = [c.nome for c in cadastro["campos"]]
+        conteudo = historico.estado_atual(registro, campos)
+        identificacao = _identificar(cadastro, registro)
+
         db.delete(registro)
         db.commit()
 
+        historico.registrar(
+            db, nome, "excluiu", usuario, pegar_ip(request),
+            registro_id=registro_id,
+            identificacao=identificacao,
+            alteracoes=historico.resumir(conteudo),
+        )
+
     return RedirectResponse(cadastro["voltar"], status_code=303)
+
+
+# ===============================================================
+# HISTÓRICO DE ALTERAÇÕES  (só o estipulante)
+# ===============================================================
+LIMITE_HISTORICO_ALTERACOES = 200
+
+
+@app.get("/historico", response_class=HTMLResponse)
+def tela_historico(
+    request: Request,
+    cadastro: str = "",
+    acao: str = "",
+    busca: str = "",
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """Quem mudou o quê, e quando."""
+    fora = barrar(usuario, "acessos")
+    if fora:
+        return fora
+
+    consulta = db.query(ChangeLog)
+
+    if cadastro:
+        consulta = consulta.filter(ChangeLog.cadastro == cadastro)
+    if acao:
+        consulta = consulta.filter(ChangeLog.acao == acao)
+    if busca:
+        alvo = f"%{busca}%"
+        consulta = consulta.filter(
+            (ChangeLog.identificacao.ilike(alvo))
+            | (ChangeLog.usuario_email.ilike(alvo))
+            | (ChangeLog.alteracoes.ilike(alvo))
+        )
+
+    total_filtrado = consulta.count()
+    registros = (
+        consulta.order_by(ChangeLog.data_hora.desc())
+        .limit(LIMITE_HISTORICO_ALTERACOES)
+        .all()
+    )
+
+    total = db.query(ChangeLog).count()
+    por_acao = dict(
+        db.query(ChangeLog.acao, func.count(ChangeLog.id))
+        .group_by(ChangeLog.acao)
+        .all()
+    )
+
+    # As fotos mensais entram na mesma tela: as duas coisas respondem
+    # "como estávamos antes?".
+    fotos = list(reversed(historico.historico_ordenado(db, quantos=24)))
+
+    return templates.TemplateResponse(
+        request,
+        "historico.html",
+        contexto(
+            usuario, "acessos",
+            registros=registros,
+            total=total,
+            total_filtrado=total_filtrado,
+            limite=LIMITE_HISTORICO_ALTERACOES,
+            por_acao=por_acao,
+            fotos=fotos,
+            cadastros_existentes=sorted(cadastros.CADASTROS),
+            filtros={"cadastro": cadastro, "acao": acao, "busca": busca},
+        ),
+    )
+
+
+@app.get("/historico/exportar")
+def exportar_historico(
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """Baixa o histórico de alterações em .csv."""
+    fora = barrar(usuario, "acessos")
+    if fora:
+        return fora
+
+    registros = db.query(ChangeLog).order_by(ChangeLog.data_hora.desc()).all()
+    linhas = [
+        [
+            r.data_hora.strftime("%d/%m/%Y %H:%M:%S"),
+            r.cadastro,
+            r.identificacao or "",
+            r.acao,
+            r.usuario_email or "",
+            r.usuario_perfil or "",
+            r.ip or "",
+            # As quebras de linha viram " | " para não estragar o CSV.
+            (r.alteracoes or "").replace("\n", " | "),
+        ]
+        for r in registros
+    ]
+    return gerar_csv(
+        "historico_de_alteracoes.csv",
+        ["Data e hora", "Cadastro", "Registro", "Ação", "Quem", "Categoria",
+         "IP", "O que mudou"],
+        linhas,
+    )
+
+
+@app.post("/historico/fotografar")
+def tirar_foto_agora(
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """
+    Atualiza a foto do mês corrente na hora.
+
+    Útil para conferir o número depois de carregar uma planilha, sem
+    esperar o mês seguinte. Só mexe no mês atual: as fotos dos meses
+    anteriores nunca são alteradas.
+    """
+    fora = barrar(usuario, "acessos")
+    if fora:
+        return fora
+
+    historico.fotografar(db, refazer=True)
+    return RedirectResponse("/historico", status_code=303)
 
 
 # ===============================================================

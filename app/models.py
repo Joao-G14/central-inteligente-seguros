@@ -419,6 +419,143 @@ class ApiCall(Base):
 
 
 # ===============================================================
+# TABELA 3g: change_log  (quem mudou o que, e quando)
+# ===============================================================
+class ChangeLog(Base):
+    """
+    Uma linha por alteracao feita nos dados.
+
+    POR QUE ISTO EXISTE
+    -------------------
+    O sistema registrava com cuidado quem ENTROU e quem CHAMOU A API,
+    mas nao registrava quem MUDOU OS DADOS. Era incoerente: se alguem
+    trocasse o capital de uma apolice de R$ 250 mil para R$ 25 mil, ou
+    excluisse um sinistro, nao sobrava rastro nenhum.
+
+    Num sistema de seguros isso pesa, porque capital segurado e sinistro
+    sao valores que geram pagamento.
+
+    O QUE GUARDAMOS
+    ---------------
+    Guardamos a identificacao em TEXTO (ex.: "AP-2041"), e nao so o
+    numero da linha. Assim o registro continua legivel mesmo depois de a
+    apolice ser excluida — que e justamente o caso em que mais se precisa
+    dele.
+
+    As alteracoes ficam num texto pronto para ler, do tipo:
+
+        capital_total: 250.000,00 -> 300.000,00
+        status: Ativa -> A renovar
+
+    Guardar em texto (e nao um campo por coluna) tem uma vantagem: se um
+    dia uma coluna deixar de existir, o historico antigo continua fazendo
+    sentido.
+    """
+
+    __tablename__ = "change_log"
+
+    id = Column(Integer, primary_key=True)
+
+    # Qual cadastro foi mexido: "apolices", "sinistros"...
+    cadastro = Column(String(40), nullable=False, index=True)
+
+    # O numero da linha e a identificacao legivel.
+    registro_id = Column(Integer, nullable=True)
+    identificacao = Column(String(120), nullable=True, index=True)
+
+    # "criou", "alterou" ou "excluiu"
+    acao = Column(String(12), nullable=False, index=True)
+
+    # O que mudou, em texto pronto para ler.
+    alteracoes = Column(Text, nullable=True)
+
+    # Quem fez.
+    usuario_email = Column(String(120), nullable=True, index=True)
+    usuario_perfil = Column(String(20), nullable=True)
+    ip = Column(String(45), nullable=True)
+
+    data_hora = Column(DateTime, nullable=False, default=tempo.agora, index=True)
+
+    def __repr__(self):
+        return f"<ChangeLog {self.acao} {self.cadastro} {self.identificacao}>"
+
+    def cor_da_acao(self) -> str:
+        """A cor da etiqueta na tela."""
+        return {"criou": "ok", "alterou": "warn", "excluiu": "late"}.get(
+            self.acao, "cinza"
+        )
+
+
+# ===============================================================
+# TABELA 3h: carteira_snapshots  (a foto da carteira, mes a mes)
+# ===============================================================
+class CarteiraSnapshot(Base):
+    """
+    Uma linha por mes, com o retrato da carteira naquele momento.
+
+    POR QUE ISTO EXISTE — e por que nao podia esperar
+    -------------------------------------------------
+    O Dashboard mostra a carteira DE HOJE. O sistema nao guardava como
+    ela estava no mes passado.
+
+    Repare na diferenca: as COMISSOES tem historico, porque a tabela
+    guarda uma linha por competencia. As APOLICES nao tinham nenhum — so
+    a foto do momento.
+
+    E dado historico e a unica coisa que NAO SE CRIA DEPOIS. Comecando a
+    guardar hoje, em cinco meses ha cinco meses de historico. Comecando
+    em cinco meses, ha zero — e aqueles meses estao perdidos para sempre.
+
+    COMO A FOTO E TIRADA
+    --------------------
+    Automaticamente, quando o sistema liga, se ainda nao houver foto do
+    mes corrente. Assim ninguem precisa lembrar de rodar nada.
+
+    Tambem da para tirar na mao:  python fotografar.py
+    """
+
+    __tablename__ = "carteira_snapshots"
+
+    id = Column(Integer, primary_key=True)
+
+    # O mes retratado, no formato MM/AAAA. Um por mes, sem repetir.
+    competencia = Column(String(7), unique=True, nullable=False, index=True)
+
+    # Quando a foto foi tirada de fato.
+    data_foto = Column(DateTime, nullable=False, default=tempo.agora)
+
+    # --- carteira ---
+    apolices_total = Column(Integer, nullable=False, default=0)
+    apolices_ativas = Column(Integer, nullable=False, default=0)
+    apolices_a_renovar = Column(Integer, nullable=False, default=0)
+    apolices_vencidas = Column(Integer, nullable=False, default=0)
+    apolices_canceladas = Column(Integer, nullable=False, default=0)
+
+    capital_segurado = Column(Float, nullable=False, default=0.0)
+    premio_mensal = Column(Float, nullable=False, default=0.0)
+    vidas_cobertas = Column(Integer, nullable=False, default=0)
+
+    # --- operacao ---
+    sinistros_abertos = Column(Integer, nullable=False, default=0)
+    propostas_esteira = Column(Integer, nullable=False, default=0)
+    inadimplentes = Column(Integer, nullable=False, default=0)
+    valor_inadimplencia = Column(Float, nullable=False, default=0.0)
+    pendencias_abertas = Column(Integer, nullable=False, default=0)
+
+    def __repr__(self):
+        return f"<CarteiraSnapshot {self.competencia}: {self.apolices_ativas} ativas>"
+
+    def mes_curto(self) -> str:
+        """'07/2026' vira 'Jul'."""
+        meses = ["", "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+                 "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+        try:
+            return meses[int(self.competencia[:2])]
+        except (ValueError, IndexError):
+            return self.competencia
+
+
+# ===============================================================
 # TABELA 3c: settings  (configuracoes que mudam pela tela)
 # ===============================================================
 class Setting(Base):

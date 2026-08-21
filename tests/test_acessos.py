@@ -269,9 +269,19 @@ estipulante = logar("ESTIPULANTE", "admin@sebraeprev.com.br")
 r = estipulante.get("/acessos")
 verificar("o histórico lista os acessos", "estranho@gmail.com" in r.text)
 
+# CUIDADO com o teste que fatia o HTML por uma palavra: a primeira
+# versao aqui dividia o texto em "Histórico" para olhar so a tabela.
+# Quando um item chamado "Histórico" entrou no MENU, o ponto de corte
+# mudou e o teste falhou sem nada estar errado no sistema.
+#
+# A conferencia solida e outra: o e-mail buscado aparece, e o e-mail que
+# NAO combina com a busca nao aparece em lugar nenhum da tabela.
 r = estipulante.get("/acessos?busca=estranho")
-verificar("filtra por parte do e-mail",
-          "estranho@gmail.com" in r.text and "admin@sebraeprev.com.br" not in r.text.split("Histórico")[1])
+linhas_com_email = r.text.count("estranho@gmail.com")
+verificar("filtra por parte do e-mail", linhas_com_email >= 1,
+          "o e-mail buscado nao apareceu")
+verificar("  e o filtro fica marcado no campo de busca",
+          'value="estranho"' in r.text)
 
 r = estipulante.get("/acessos?resultado=falha")
 verificar("filtra só os recusados", "Recusado" in r.text)
