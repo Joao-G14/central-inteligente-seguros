@@ -61,7 +61,12 @@
         <h3>Participantes inadimplentes</h3>
         <p>Ordenados por dias em atraso — os mais críticos primeiro</p>
       </div>
-      <a class="exp-btn" href="/inadimplencia/exportar" download>⬇ Exportar Excel</a>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <a class="exp-btn" href="/inadimplencia/exportar" download>⬇ Exportar Excel</a>
+        <a href="/cadastro/inadimplencia/novo" class="btn-enviar" style="text-decoration:none">
+          + Novo registro
+        </a>
+      </div>
     </div>
 
     <div class="tabela-rolagem">
@@ -91,10 +96,13 @@
                   <button class="act-btn" disabled>✓ Cobrança enviada</button>
                 {% else %}
                   {# POST porque a acao grava no banco #}
-                  <form method="post" action="/inadimplencia/cobrar/{{ d.id }}">
+                  <form method="post" action="/inadimplencia/cobrar/{{ d.id }}"
+                        style="display:inline">
                     <button type="submit" class="act-btn">Cobrar</button>
                   </form>
                 {% endif %}
+                <a href="/cadastro/inadimplencia/{{ d.id }}/editar"
+                   class="act-btn">Editar</a>
               </td>
             </tr>
           {% else %}

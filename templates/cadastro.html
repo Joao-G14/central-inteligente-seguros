@@ -1,0 +1,162 @@
+{# ==================================================================
+   cadastro.html — o formulario de cadastrar e editar
+   ==================================================================
+   Este arquivo unico serve para TODOS os cadastros: apolices,
+   sinistros, propostas, pendencias e inadimplencia.
+
+   Ele nao sabe nada sobre seguros. Ele so sabe desenhar campos a partir
+   da descricao que vem de app/cadastros.py. Por isso, acrescentar um
+   campo novo la nao exige tocar em nenhum HTML.
+   ================================================================== #}
+{% extends "base.html" %}
+
+{% block titulo %}{{ acao }} {{ cadastro.titulo }} — Central de Seguros{% endblock %}
+{% block cabecalho %}{{ acao }} {{ cadastro.titulo }}{% endblock %}
+{% block subcabecalho %}
+  {% if editando %}
+    Alterando um registro já existente
+  {% else %}
+    Incluindo um registro novo em {{ cadastro.plural }}
+  {% endif %}
+{% endblock %}
+
+{% block conteudo %}
+
+  {# ---------- ERROS DE PREENCHIMENTO ----------
+     Mostramos TODOS de uma vez, e não um por vez: assim a pessoa
+     corrige tudo numa única passada. #}
+  {% if erros %}
+    <div class="erro-lista">
+      <b>⚠️ {{ erros|length }} problema(s) no preenchimento:</b>
+      <ul>
+        {% for e in erros %}<li>{{ e }}</li>{% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>
+          {% if editando %}
+            Editando: {{ identificacao }}
+          {% else %}
+            Dados da {{ cadastro.titulo|lower }}
+          {% endif %}
+        </h3>
+        <p>Os campos com <span style="color:var(--red)">*</span> são obrigatórios</p>
+      </div>
+      <a href="{{ cadastro.voltar }}" class="exp-btn">← Voltar sem salvar</a>
+    </div>
+
+    <form method="post" action="{{ destino }}">
+      <div class="grade-campos">
+
+        {% for campo in campos %}
+          {# valores[campo.nome] guarda o que a pessoa digitou. Ao dar
+             erro, os dados voltam preenchidos — nada é perdido. #}
+          {% set valor = valores.get(campo.nome) %}
+
+          <div class="campo-cadastro {{ 'inteira' if campo.largura == 'inteira' }}">
+
+            {% if campo.tipo == 'sim_nao' %}
+              {# --- caixinha de marcar --- #}
+              <label class="marcar">
+                <input type="checkbox" name="{{ campo.nome }}" value="sim"
+                       {% if valor %}checked{% endif %}>
+                <span>
+                  <b>{{ campo.rotulo }}</b>
+                  {% if campo.ajuda %}<br><small>{{ campo.ajuda }}</small>{% endif %}
+                </span>
+              </label>
+
+            {% else %}
+              <label for="{{ campo.nome }}">
+                {{ campo.rotulo }}{% if campo.obrigatorio %}<span style="color:var(--red)"> *</span>{% endif %}
+              </label>
+
+              {% if campo.tipo == 'selecao' %}
+                <select id="{{ campo.nome }}" name="{{ campo.nome }}"
+                        {% if campo.obrigatorio %}required{% endif %}>
+                  {% if not campo.obrigatorio %}<option value="">—</option>{% endif %}
+                  {% for opcao in campo.opcoes %}
+                    {% if opcao %}
+                      <option value="{{ opcao }}" {% if valor == opcao %}selected{% endif %}>
+                        {{ opcao }}
+                      </option>
+                    {% endif %}
+                  {% endfor %}
+                </select>
+
+              {% elif campo.tipo == 'textao' %}
+                <textarea id="{{ campo.nome }}" name="{{ campo.nome }}" rows="3"
+                          {% if campo.obrigatorio %}required{% endif %}>{{ valor or '' }}</textarea>
+
+              {% elif campo.tipo == 'data' %}
+                {# type="date" faz o navegador mostrar o calendário.
+                   O valor precisa ir no formato AAAA-MM-DD, que é o que
+                   o padrão HTML exige — a tela mostra dia/mês/ano. #}
+                <input type="date" id="{{ campo.nome }}" name="{{ campo.nome }}"
+                       value="{{ valor.strftime('%Y-%m-%d') if valor and valor.strftime else (valor or '') }}"
+                       {% if campo.obrigatorio %}required{% endif %}>
+
+              {% elif campo.tipo == 'numero' %}
+                <input type="number" id="{{ campo.nome }}" name="{{ campo.nome }}"
+                       value="{{ valor if valor is not none else '' }}"
+                       {% if campo.minimo is not none %}min="{{ campo.minimo|int }}"{% endif %}
+                       {% if campo.obrigatorio %}required{% endif %}>
+
+              {% else %}
+                {# texto e dinheiro. O dinheiro fica como texto para
+                   aceitar 1.234,56 do jeito brasileiro. #}
+                <input type="text" id="{{ campo.nome }}" name="{{ campo.nome }}"
+                       value="{{ dinheiro(valor) if campo.tipo == 'dinheiro' and valor is not none else (valor or '') }}"
+                       {% if campo.tamanho %}maxlength="{{ campo.tamanho }}"{% endif %}
+                       {% if campo.obrigatorio %}required{% endif %}
+                       {% if campo.tipo == 'dinheiro' %}inputmode="decimal"{% endif %}>
+              {% endif %}
+
+              {% if campo.ajuda %}
+                <small class="ajuda-campo">{{ campo.ajuda }}</small>
+              {% endif %}
+            {% endif %}
+
+          </div>
+        {% endfor %}
+
+      </div>
+
+      <div class="acoes-cadastro">
+        <button type="submit" class="btn-enviar">
+          {% if editando %}Salvar alterações{% else %}Cadastrar{% endif %}
+        </button>
+        <a href="{{ cadastro.voltar }}" class="exp-btn">Cancelar</a>
+      </div>
+    </form>
+  </div>
+
+  {# ---------- EXCLUIR ----------
+     Fica num painel separado, embaixo, e não junto do botão de salvar.
+     É de propósito: separar o botão destrutivo do botão que se usa toda
+     hora evita clique errado. #}
+  {% if editando %}
+    <div class="panel" style="border-color:var(--vermelho-borda)">
+      <div class="ph">
+        <div>
+          <h3 style="color:var(--red)">Excluir este registro</h3>
+          <p>Esta ação não pode ser desfeita</p>
+        </div>
+        <form method="post" action="{{ destino_excluir }}"
+              onsubmit="return confirm('Excluir {{ identificacao }}?\n\nIsto não pode ser desfeito.')">
+          <button type="submit" class="act-btn perigo">Excluir {{ identificacao }}</button>
+        </form>
+      </div>
+      <p class="dica" style="margin:0">
+        💡 Antes de excluir, considere se não seria melhor apenas mudar a
+        situação do registro. Excluir apaga o histórico; mudar a situação
+        preserva.
+      </p>
+    </div>
+  {% endif %}
+
+{% endblock %}

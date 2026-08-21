@@ -18,6 +18,9 @@
         <h3>Esteira de aceitação de apólices</h3>
         <p>{{ total }} propostas em andamento</p>
       </div>
+      <a href="/cadastro/propostas/novo" class="btn-enviar" style="text-decoration:none">
+        + Nova proposta
+      </a>
     </div>
 
     <div class="board">
@@ -68,6 +71,7 @@
             <th class="num">Capital</th>
             <th>Etapa</th>
             <th>Observação</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -91,6 +95,9 @@
                 {% endif %}
               </td>
               <td>{{ p.observacao or '—' }}</td>
+              <td style="white-space:nowrap">
+                <a href="/cadastro/propostas/{{ p.id }}/editar" class="act-btn">Editar</a>
+              </td>
             </tr>
           {% endfor %}
         </tbody>

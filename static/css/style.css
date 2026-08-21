@@ -1826,6 +1826,120 @@ code {
   border-color: var(--red);
 }
 
+/* ==================================================================
+   FORMULARIO DE CADASTRO
+   ==================================================================
+   Usado pelas telas de cadastrar e editar. Os campos se organizam em
+   duas colunas; alguns ocupam a linha inteira.
+   ================================================================== */
+.grade-campos {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px 20px;
+}
+
+.campo-cadastro.inteira {
+  grid-column: 1 / -1;
+}
+
+.campo-cadastro label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  margin-bottom: 6px;
+}
+
+.campo-cadastro input[type="text"],
+.campo-cadastro input[type="number"],
+.campo-cadastro input[type="date"],
+.campo-cadastro select,
+.campo-cadastro textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  background: #fff;
+  color: var(--ink);
+  transition: .15s;
+}
+
+.campo-cadastro input:focus,
+.campo-cadastro select:focus,
+.campo-cadastro textarea:focus {
+  border-color: var(--blue2);
+  box-shadow: 0 0 0 3px rgba(26, 152, 218, .14);
+}
+
+.campo-cadastro textarea {
+  resize: vertical;
+  min-height: 74px;
+}
+
+/* O textinho de ajuda embaixo do campo */
+.ajuda-campo {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 5px;
+  line-height: 1.45;
+}
+
+/* Caixinha de marcar: a area clicavel inclui o texto todo */
+.campo-cadastro .marcar {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  background: var(--cinza-claro);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 13px 15px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13.5px;
+  color: var(--ink);
+  font-weight: 400;
+  margin: 0;
+}
+
+.campo-cadastro .marcar:hover {
+  border-color: var(--blue2);
+}
+
+.campo-cadastro .marcar input {
+  margin-top: 2px;
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.campo-cadastro .marcar small {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+/* Os botoes no fim do formulario */
+.acoes-cadastro {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.acoes-cadastro .exp-btn {
+  text-decoration: none;
+}
+
 /* --- Navegacao entre paginas da tabela --- */
 .paginacao {
   display: flex;
@@ -2062,5 +2176,10 @@ code {
 
   .api-flow {
     flex-direction: column;
+  }
+
+  /* Em tela pequena, o formulario vira uma coluna so. */
+  .grade-campos {
+    grid-template-columns: 1fr;
   }
 }

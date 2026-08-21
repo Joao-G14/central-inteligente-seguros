@@ -36,7 +36,8 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app import api, assistente, assistente_ia, auth, config, ia_local, planilha, seed, tempo
+from app import (api, assistente, assistente_ia, auth, cadastros, config,
+                 ia_local, planilha, seed, tempo)
 from app.database import PASTA_RAIZ, get_db
 from app.menu import MENU, buscar_modulo
 from app.models import (
@@ -280,6 +281,24 @@ def formatar_compacto(valor: float) -> str:
 # E por isso que nos arquivos .html podemos escrever {{ reais(1000) }}.
 templates.env.globals["reais"] = formatar_reais
 templates.env.globals["capital_curto"] = formatar_compacto
+
+def _dinheiro_no_formulario(valor) -> str:
+    """
+    Formata um valor para aparecer DENTRO de um campo de formulario.
+
+    Diferente de reais(): aqui NAO colocamos "R$", porque o campo espera
+    so o numero. Mas mantemos o padrao brasileiro (1.234,56), que e como
+    as pessoas digitam — e a validacao aceita as duas formas.
+    """
+    if valor is None or valor == "":
+        return ""
+    try:
+        return f"{float(valor):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except (TypeError, ValueError):
+        return str(valor)
+
+
+templates.env.globals["dinheiro"] = _dinheiro_no_formulario
 
 
 def contexto(usuario: User, modulo: str, **extras) -> dict:
@@ -1691,6 +1710,242 @@ def exportar_acessos(
         ["Data e hora", "E-mail informado", "Categoria", "IP", "Resultado", "Motivo"],
         linhas,
     )
+
+
+# ===============================================================
+# CADASTRAR, EDITAR E EXCLUIR
+# ===============================================================
+# Cinco funções servem os cinco cadastros (apólices, sinistros,
+# propostas, pendências e inadimplência). O que muda entre eles está
+# descrito em app/cadastros.py, não aqui.
+#
+# Os endereços seguem sempre o mesmo padrão:
+#     /cadastro/apolices/novo
+#     /cadastro/apolices/3/editar
+#     /cadastro/apolices/3/excluir
+
+
+def _abrir_cadastro(usuario: User | None, nome: str):
+    """
+    Confere se o cadastro existe e se a pessoa pode mexer nele.
+
+    A permissão é a MESMA da tela de listagem: quem não pode ver
+    sinistros também não pode cadastrar sinistros. Sem isso, alguém
+    barrado na tela conseguiria cadastrar pelo endereço direto.
+
+    Devolve (cadastro, None) se pode, ou (None, redirecionamento).
+    """
+    cadastro = cadastros.buscar(nome)
+    if cadastro is None:
+        return None, RedirectResponse("/dashboard", status_code=303)
+
+    fora = barrar(usuario, cadastro["permissao"])
+    if fora:
+        return None, fora
+
+    return cadastro, None
+
+
+def _identificar(cadastro: dict, registro) -> str:
+    """O texto que identifica o registro na tela (ex.: 'AP-2041')."""
+    return str(getattr(registro, cadastro["identificador"], "") or f"#{registro.id}")
+
+
+def _tela_cadastro(request, usuario, nome, cadastro, valores,
+                   erros=None, registro=None):
+    """Monta o formulário. Serve tanto para criar quanto para editar."""
+    editando = registro is not None
+    return templates.TemplateResponse(
+        request,
+        "cadastro.html",
+        contexto(
+            usuario, cadastro["permissao"],
+            cadastro=cadastro,
+            campos=cadastros.campos_visiveis(cadastro),
+            valores=valores,
+            erros=erros or [],
+            editando=editando,
+            acao="Editar" if editando else "Novo",
+            identificacao=_identificar(cadastro, registro) if editando else "",
+            destino=(f"/cadastro/{nome}/{registro.id}/editar" if editando
+                     else f"/cadastro/{nome}/novo"),
+            destino_excluir=(f"/cadastro/{nome}/{registro.id}/excluir"
+                             if editando else ""),
+        ),
+    )
+
+
+@app.get("/cadastro/{nome}/novo", response_class=HTMLResponse)
+def form_novo(
+    nome: str,
+    request: Request,
+    usuario: User | None = Depends(exigir_login),
+):
+    """Mostra o formulário em branco."""
+    cadastro, fora = _abrir_cadastro(usuario, nome)
+    if fora:
+        return fora
+
+    # Alguns campos já vêm sugeridos, para poupar digitação.
+    sugestoes = {}
+    for campo in cadastros.campos_visiveis(cadastro):
+        if campo.tipo == "sim_nao":
+            # Os campos "..._ok" começam marcados: o caso normal é o
+            # documento estar em ordem.
+            sugestoes[campo.nome] = campo.nome.endswith("_ok")
+        elif campo.nome == "competencia":
+            sugestoes[campo.nome] = tempo.hoje().strftime("%m/%Y")
+        elif campo.nome in ("data_abertura", "data_inicio"):
+            sugestoes[campo.nome] = tempo.hoje()
+
+    return _tela_cadastro(request, usuario, nome, cadastro, sugestoes)
+
+
+@app.post("/cadastro/{nome}/novo", response_class=HTMLResponse)
+async def salvar_novo(
+    nome: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """Grava um registro novo."""
+    cadastro, fora = _abrir_cadastro(usuario, nome)
+    if fora:
+        return fora
+
+    enviado = dict(await request.form())
+    valores, erros = cadastros.validar(cadastro["campos"], enviado)
+
+    # Regras que dependem de mais de um campo (ex.: vencimento depois
+    # do início da vigência).
+    if not erros and cadastro.get("validar_extra"):
+        erros += cadastro["validar_extra"](valores)
+
+    # O identificador não pode repetir.
+    identificador = cadastro["identificador"]
+    coluna = getattr(cadastro["modelo"], identificador)
+    if not erros and valores.get(identificador):
+        existe = db.query(cadastro["modelo"]).filter(
+            coluna == valores[identificador]
+        ).first()
+        if existe:
+            erros.append(f'Já existe um registro com "{valores[identificador]}".')
+
+    if erros:
+        return _tela_cadastro(request, usuario, nome, cadastro, valores, erros)
+
+    if cadastro.get("calcular"):
+        valores = cadastro["calcular"](valores)
+
+    # Marca que o registro veio da tela, e não da planilha nem do seed.
+    if any(c.nome == "origem" for c in cadastro["campos"]):
+        valores["origem"] = "manual"
+
+    db.add(cadastro["modelo"](**valores))
+    db.commit()
+
+    return RedirectResponse(cadastro["voltar"], status_code=303)
+
+
+@app.get("/cadastro/{nome}/{registro_id}/editar", response_class=HTMLResponse)
+def form_editar(
+    nome: str,
+    registro_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """Mostra o formulário preenchido com o que está no banco."""
+    cadastro, fora = _abrir_cadastro(usuario, nome)
+    if fora:
+        return fora
+
+    registro = db.query(cadastro["modelo"]).filter(
+        cadastro["modelo"].id == registro_id
+    ).first()
+    if registro is None:
+        return RedirectResponse(cadastro["voltar"], status_code=303)
+
+    valores = {
+        c.nome: getattr(registro, c.nome, None)
+        for c in cadastros.campos_visiveis(cadastro)
+    }
+
+    return _tela_cadastro(request, usuario, nome, cadastro, valores,
+                          registro=registro)
+
+
+@app.post("/cadastro/{nome}/{registro_id}/editar", response_class=HTMLResponse)
+async def salvar_edicao(
+    nome: str,
+    registro_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """Grava as alterações."""
+    cadastro, fora = _abrir_cadastro(usuario, nome)
+    if fora:
+        return fora
+
+    registro = db.query(cadastro["modelo"]).filter(
+        cadastro["modelo"].id == registro_id
+    ).first()
+    if registro is None:
+        return RedirectResponse(cadastro["voltar"], status_code=303)
+
+    enviado = dict(await request.form())
+    valores, erros = cadastros.validar(cadastro["campos"], enviado)
+
+    if not erros and cadastro.get("validar_extra"):
+        erros += cadastro["validar_extra"](valores)
+
+    # O identificador não pode bater com o de OUTRO registro. O "!=" no
+    # id é o que permite salvar sem mudar o identificador.
+    identificador = cadastro["identificador"]
+    coluna = getattr(cadastro["modelo"], identificador)
+    if not erros and valores.get(identificador):
+        conflito = db.query(cadastro["modelo"]).filter(
+            coluna == valores[identificador],
+            cadastro["modelo"].id != registro_id,
+        ).first()
+        if conflito:
+            erros.append(f'Outro registro já usa "{valores[identificador]}".')
+
+    if erros:
+        return _tela_cadastro(request, usuario, nome, cadastro, valores,
+                              erros, registro)
+
+    if cadastro.get("calcular"):
+        valores = cadastro["calcular"](valores)
+
+    for chave, valor in valores.items():
+        setattr(registro, chave, valor)
+    db.commit()
+
+    return RedirectResponse(cadastro["voltar"], status_code=303)
+
+
+@app.post("/cadastro/{nome}/{registro_id}/excluir")
+def excluir_registro(
+    nome: str,
+    registro_id: int,
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """Apaga o registro."""
+    cadastro, fora = _abrir_cadastro(usuario, nome)
+    if fora:
+        return fora
+
+    registro = db.query(cadastro["modelo"]).filter(
+        cadastro["modelo"].id == registro_id
+    ).first()
+    if registro is not None:
+        db.delete(registro)
+        db.commit()
+
+    return RedirectResponse(cadastro["voltar"], status_code=303)
 
 
 # ===============================================================

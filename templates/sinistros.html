@@ -35,8 +35,13 @@
         <h3>Sinistros em andamento</h3>
         <p>Morte e invalidez — ordenados do mais antigo para o mais recente</p>
       </div>
-      <input class="search" type="search" placeholder="Buscar protocolo ou participante…"
-             oninput="filtrarTabela(this, 'tabelaSinistros')">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <input class="search" type="search" placeholder="Buscar protocolo ou participante…"
+               oninput="filtrarTabela(this, 'tabelaSinistros')">
+        <a href="/cadastro/sinistros/novo" class="btn-enviar" style="text-decoration:none">
+          + Novo sinistro
+        </a>
+      </div>
     </div>
 
     <div class="tabela-rolagem">
@@ -50,6 +55,7 @@
             <th class="num">Dias em aberto</th>
             <th>Documentação</th>
             <th>Status</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -76,9 +82,12 @@
                   <span class="pill warn">{{ s.status }}</span>
                 {% endif %}
               </td>
+              <td style="white-space:nowrap">
+                <a href="/cadastro/sinistros/{{ s.id }}/editar" class="act-btn">Editar</a>
+              </td>
             </tr>
           {% else %}
-            <tr><td colspan="7" class="vazio">Nenhum sinistro em andamento.</td></tr>
+            <tr><td colspan="8" class="vazio">Nenhum sinistro em andamento.</td></tr>
           {% endfor %}
         </tbody>
       </table>
