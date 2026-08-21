@@ -1,0 +1,239 @@
+{# ==================================================================
+   api_chaves.html — chaves da API e registro de chamadas
+   ==================================================================
+   Tela exclusiva do ESTIPULANTE.
+   ================================================================== #}
+{% extends "base.html" %}
+
+{% block titulo %}Chaves da API — Central de Seguros{% endblock %}
+{% block cabecalho %}Chaves da API{% endblock %}
+{% block subcabecalho %}Quem pode consultar a Central por sistema, e o que já foi chamado{% endblock %}
+
+{% block conteudo %}
+
+  {% if aviso %}<div class="sucesso"><b>✅ {{ aviso }}</b></div>{% endif %}
+  {% if erro %}<div class="erro-lista"><b>⚠️ {{ erro }}</b></div>{% endif %}
+
+  {# ---------- A CHAVE RECÉM-CRIADA ----------
+     Aparece UMA única vez. Depois nem o sistema consegue mostrar de
+     novo, porque guardamos só o hash. #}
+  {% if chave_nova %}
+    <div class="panel" style="border:2px solid var(--green-leaf)">
+      <div class="ph">
+        <div>
+          <h3>🔑 Chave criada para “{{ nome_novo }}”</h3>
+          <p>Copie agora — esta é a única vez que ela aparece</p>
+        </div>
+      </div>
+      <div class="chave-nova">
+        <code id="chaveNova">{{ chave_nova }}</code>
+        <button type="button" class="btn-enviar" onclick="copiarChave()">Copiar</button>
+      </div>
+      <p class="dica">
+        Guardamos apenas o <b>hash</b> desta chave, do mesmo jeito que
+        fazemos com senhas. Isso significa que <b>nem nós conseguimos vê-la
+        de novo</b>. Se o parceiro perder, você gera outra e bloqueia esta.
+        <br><br>
+        Envie a chave por um canal seguro — evite e-mail comum.
+      </p>
+      <script>
+        function copiarChave() {
+          const t = document.getElementById('chaveNova').innerText;
+          navigator.clipboard.writeText(t).then(function () {
+            alert('Chave copiada.');
+          });
+        }
+      </script>
+    </div>
+  {% endif %}
+
+  {# ---------- OS NÚMEROS ---------- #}
+  <div class="kpis">
+    <div class="kpi">
+      <div class="lbl">Chaves ativas</div>
+      <div class="val">{{ kpis.ativas }}</div>
+      <div class="delta">uma por parceiro</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Chamadas recebidas</div>
+      <div class="val">{{ kpis.total }}</div>
+      <div class="delta">desde o início</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Chamadas recusadas</div>
+      <div class="val">{{ kpis.recusadas }}</div>
+      <div class="delta {{ 'down' if kpis.recusadas else '' }}">chave inválida ou ausente</div>
+    </div>
+    <div class="kpi">
+      <div class="lbl">Chave única do .env</div>
+      <div class="val" style="font-size:20px">{{ 'Ativa' if kpis.tem_env else 'Desligada' }}</div>
+      <div class="delta warn">{{ 'considere remover' if kpis.tem_env else 'ok' }}</div>
+    </div>
+  </div>
+
+  {# ---------- CADASTRAR ---------- #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Chaves por parceiro</h3>
+        <p>Cada sistema que consulta a Central deve ter a sua própria chave</p>
+      </div>
+    </div>
+
+    <form method="post" action="/api-chaves/criar" class="form-linha">
+      <div class="campo-linha">
+        <label for="nome">Nome do parceiro</label>
+        <input type="text" id="nome" name="nome" required
+               placeholder="Ex.: Corretora Parceira, ICATU, Power BI">
+      </div>
+      <div class="campo-linha">
+        <label for="observacao">Observação (opcional)</label>
+        <input type="text" id="observacao" name="observacao"
+               placeholder="Ex.: envia a movimentação mensal">
+      </div>
+      <button type="submit" class="btn-enviar">Gerar chave</button>
+    </form>
+
+    <p class="dica">
+      💡 <b>Por que uma chave para cada um:</b> se a chave da corretora
+      vazar, você bloqueia só a dela — as outras continuam funcionando. E o
+      registro abaixo mostra o nome de quem fez cada chamada, o que seria
+      impossível com uma chave compartilhada.
+    </p>
+
+    <div class="tabela-rolagem">
+      <table>
+        <thead>
+          <tr>
+            <th>Parceiro</th>
+            <th>Início da chave</th>
+            <th>Observação</th>
+            <th>Criada</th>
+            <th>Último uso</th>
+            <th>Situação</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in chaves %}
+            <tr>
+              <td><b>{{ c.nome }}</b></td>
+              <td><code>{{ c.inicio }}…</code></td>
+              <td>{{ c.observacao or '—' }}</td>
+              <td>
+                {{ c.criado_em.strftime('%d/%m/%Y') }}<br>
+                <span style="font-size:11px;color:var(--muted)">{{ c.criado_por or '—' }}</span>
+              </td>
+              <td>
+                {% if c.ultimo_uso %}
+                  {{ c.ultimo_uso.strftime('%d/%m/%Y %H:%M') }}
+                {% else %}
+                  <span style="color:var(--muted)">nunca usada</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if c.ativo %}
+                  <span class="pill ok">Ativa</span>
+                {% else %}
+                  <span class="pill late">Bloqueada</span>
+                {% endif %}
+              </td>
+              <td style="white-space:nowrap">
+                <form method="post" action="/api-chaves/alternar/{{ c.id }}" style="display:inline">
+                  <button type="submit" class="act-btn">
+                    {{ 'Bloquear' if c.ativo else 'Reativar' }}
+                  </button>
+                </form>
+                <form method="post" action="/api-chaves/remover/{{ c.id }}" style="display:inline"
+                      onsubmit="return confirm('Remover a chave de {{ c.nome }}? O parceiro perde o acesso na hora.')">
+                  <button type="submit" class="act-btn perigo">Remover</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="7" class="vazio">
+                Nenhuma chave cadastrada. Enquanto isso, a chave única do
+                <code>.env</code> continua funcionando.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if kpis.tem_env %}
+      <p class="dica">
+        ⚠️ A <b>chave única do <code>.env</code></b> ainda está ativa e
+        funciona para qualquer um que a tenha. Depois de cadastrar as chaves
+        dos parceiros aqui, apague <code>API_KEY</code> do <code>.env</code>
+        para que só as chaves com nome funcionem.
+      </p>
+    {% endif %}
+  </div>
+
+  {# ---------- REGISTRO DE CHAMADAS ---------- #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Chamadas recebidas</h3>
+        <p>
+          Toda chamada à API, inclusive as recusadas
+          {% if kpis.total > limite %}— mostrando as {{ limite }} mais recentes{% endif %}
+        </p>
+      </div>
+      <a class="exp-btn" href="/api-chaves/exportar" download>⬇ Exportar Excel</a>
+    </div>
+
+    <div class="tabela-rolagem">
+      <table>
+        <thead>
+          <tr>
+            <th>Data e hora</th>
+            <th>Parceiro</th>
+            <th>Método</th>
+            <th>Endereço</th>
+            <th>Resultado</th>
+            <th>Origem (IP)</th>
+            <th>Observação</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in chamadas %}
+            <tr>
+              <td style="white-space:nowrap">{{ c.data_hora.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+              <td>
+                {% if c.parceiro %}
+                  {{ c.parceiro }}
+                {% else %}
+                  <span style="color:var(--red)">não identificado</span>
+                {% endif %}
+              </td>
+              <td><span class="pill {{ 'ok' if c.metodo == 'GET' else 'blue' }}">{{ c.metodo }}</span></td>
+              <td><code>{{ c.caminho }}</code></td>
+              <td>
+                {% if c.status < 300 %}
+                  <span class="pill ok">{{ c.status }}</span>
+                {% elif c.status == 401 %}
+                  <span class="pill late">{{ c.status }} recusada</span>
+                {% else %}
+                  <span class="pill warn">{{ c.status }}</span>
+                {% endif %}
+              </td>
+              <td>{{ c.ip or '—' }}</td>
+              <td style="font-size:12px;color:var(--muted)">{{ c.resumo or '—' }}</td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="7" class="vazio">
+                Nenhuma chamada registrada ainda. Elas aparecem aqui assim que
+                algum sistema consultar a API.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+{% endblock %}

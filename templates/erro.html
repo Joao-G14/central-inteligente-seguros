@@ -1,0 +1,58 @@
+{# ==================================================================
+   erro.html — a tela mostrada quando algo da errado
+   ==================================================================
+   Sem este arquivo, um endereco errado mostraria um JSON cru em ingles
+   ("Not Found"), o que assusta e nao ajuda ninguem.
+
+   NAO usa o base.html de proposito: o erro pode acontecer justamente
+   quando nao ha ninguem logado, e ai o menu lateral nem poderia ser
+   montado.
+   ================================================================== #}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ codigo }} — Central de Seguros</title>
+  <link rel="icon" type="image/jpeg" href="/static/img/favicon.jpg">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="tela-login">
+
+  <div class="login-card" style="text-align:center">
+
+    <div class="login-marca">
+      <img src="/static/img/sebraeprev.webp" alt="Sebrae Previdência" class="login-logo">
+      <div class="login-nome">Central de Seguros</div>
+    </div>
+
+    <div style="font-size:52px;margin:22px 0 6px">{{ icone }}</div>
+
+    <h2 style="font-size:20px;color:var(--navy);margin-bottom:10px">
+      {{ titulo }}
+    </h2>
+
+    <p style="font-size:13.5px;color:var(--muted);line-height:1.65;margin-bottom:8px">
+      {{ mensagem }}
+    </p>
+
+    <p style="font-size:11.5px;color:var(--muted);margin-bottom:22px">
+      Código do erro: <b>{{ codigo }}</b>
+    </p>
+
+    <a href="/dashboard" class="btn-entrar" style="display:block;text-decoration:none">
+      Voltar ao início
+    </a>
+
+    {% if codigo == 500 %}
+      <p class="login-rodape">
+        Se o erro continuar, avise quem cuida do sistema e diga o que você
+        estava fazendo quando aconteceu. Isso ajuda a encontrar a causa.
+      </p>
+    {% endif %}
+
+  </div>
+
+  <script src="/static/js/main.js"></script>
+</body>
+</html>

@@ -1,8 +1,11 @@
 {# ==================================================================
    seguros.html — a carteira de apolices
    ==================================================================
-   Equivale a tela "Gestao de Seguros" do prototipo, mas lendo as
-   apolices de verdade do banco de dados.
+   Equivale a tela "Gestao de Seguros" do prototipo, lendo as apolices
+   do banco.
+
+   A tabela e PAGINADA: mostra 50 por vez. Assim a tela continua rapida
+   mesmo quando a carteira crescer para milhares de apolices.
    ================================================================== #}
 {% extends "base.html" %}
 
@@ -16,14 +19,40 @@
     <div class="ph">
       <div>
         <h3>Carteira de apólices</h3>
-        <p>{{ apolices|length }} apólices no total</p>
+        <p>
+          {% if total %}
+            mostrando {{ primeiro }} a {{ ultimo }} de <b>{{ total }}</b>
+            {% if filtros.status or filtros.busca %}(filtrado){% endif %}
+          {% else %}
+            nenhuma apólice encontrada
+          {% endif %}
+        </p>
       </div>
-      {# Este campo filtra a tabela na hora, sem recarregar a pagina.
-         A funcao filtrarTabela esta em static/js/main.js #}
-      <input class="search" type="search"
-             placeholder="Buscar participante ou apólice…"
-             oninput="filtrarTabela(this, 'tabelaApolices')">
     </div>
+
+    {# ---------- FILTROS ----------
+       Ficam num formulário GET: os filtros vão na barra de endereço, o
+       que permite salvar o link ou mandar para um colega. #}
+    <form method="get" action="/seguros" class="form-linha">
+      <div class="campo-linha">
+        <label for="busca">Buscar</label>
+        <input type="search" id="busca" name="busca" value="{{ filtros.busca or '' }}"
+               placeholder="nome, número da apólice ou CPF…">
+      </div>
+      <div class="campo-linha" style="max-width:190px">
+        <label for="status">Situação</label>
+        <select id="status" name="status">
+          <option value="">Todas</option>
+          {% for s in status_existentes %}
+            <option value="{{ s }}" {% if filtros.status == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn-enviar">Filtrar</button>
+      {% if filtros.status or filtros.busca %}
+        <a href="/seguros" class="exp-btn">Limpar</a>
+      {% endif %}
+    </form>
 
     <div class="tabela-rolagem">
       <table id="tabelaApolices">
@@ -61,11 +90,45 @@
               </td>
             </tr>
           {% else %}
-            <tr><td colspan="7" class="vazio">Nenhuma apólice cadastrada.</td></tr>
+            <tr>
+              <td colspan="7" class="vazio">
+                {% if filtros.status or filtros.busca %}
+                  Nenhuma apólice encontrada com esses filtros.
+                {% else %}
+                  Nenhuma apólice cadastrada.
+                {% endif %}
+              </td>
+            </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+
+    {# ---------- NAVEGACAO ENTRE PAGINAS ---------- #}
+    {% if paginas > 1 %}
+      {# Guarda os filtros atuais para eles não se perderem ao trocar de
+         página — é o erro mais comum em paginação. #}
+      {% set filtro_url = '&status=' ~ (filtros.status or '') ~ '&busca=' ~ (filtros.busca or '') %}
+      <div class="paginacao">
+        {% if pagina > 1 %}
+          <a href="/seguros?pagina=1{{ filtro_url }}" title="Primeira página">« início</a>
+          <a href="/seguros?pagina={{ pagina - 1 }}{{ filtro_url }}">‹ anterior</a>
+        {% else %}
+          <span class="desativado">« início</span>
+          <span class="desativado">‹ anterior</span>
+        {% endif %}
+
+        <span class="atual">página {{ pagina }} de {{ paginas }}</span>
+
+        {% if pagina < paginas %}
+          <a href="/seguros?pagina={{ pagina + 1 }}{{ filtro_url }}">próxima ›</a>
+          <a href="/seguros?pagina={{ paginas }}{{ filtro_url }}" title="Última página">fim »</a>
+        {% else %}
+          <span class="desativado">próxima ›</span>
+          <span class="desativado">fim »</span>
+        {% endif %}
+      </div>
+    {% endif %}
   </div>
 
 {% endblock %}

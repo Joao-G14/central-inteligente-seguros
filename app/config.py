@@ -47,8 +47,16 @@ def ler(chave: str, padrao: str = "") -> str:
 # ---------------------------------------------------------------
 # CONFIGURACOES DO PROJETO
 # ---------------------------------------------------------------
-# Chave usada para assinar o cookie de sessao do login (Fase 3).
-SECRET_KEY = ler("SECRET_KEY", "chave-insegura-apenas-para-desenvolvimento")
+# Chave usada para assinar o cookie de sessao do login.
+#
+# PERIGO: este valor padrao esta publicado no GitHub. Se o servidor
+# subir com ele, qualquer pessoa que leia o repositorio consegue FORJAR
+# um cookie e entrar como estipulante sem senha nenhuma.
+#
+# Por isso, mais abaixo, o sistema se RECUSA a subir em producao usando
+# esta chave. Em desenvolvimento ele apenas avisa.
+SECRET_KEY_INSEGURA = "chave-insegura-apenas-para-desenvolvimento"
+SECRET_KEY = ler("SECRET_KEY", SECRET_KEY_INSEGURA)
 
 # A senha de cada CATEGORIA de acesso. Quem escolher a categoria na tela
 # de login e digitar a senha correspondente entra — o e-mail e livre.
@@ -108,3 +116,58 @@ CRIAR_BANCO_AO_INICIAR = _e_sim(ler("CRIAR_BANCO_AO_INICIAR", "sim"))
 #
 # So tem efeito quando o banco esta vazio. Nunca apaga o que ja existe.
 CARREGAR_DADOS_DEMO = _e_sim(ler("CARREGAR_DADOS_DEMO", "sim"))
+
+
+# ===============================================================
+# CONFERENCIA DE SEGURANCA AO LIGAR
+# ===============================================================
+def conferir_seguranca() -> list[str]:
+    """
+    Confere se ha alguma configuracao perigosa.
+
+    Devolve a lista de problemas GRAVES encontrados. Se houver algum e o
+    sistema estiver em producao, ele nao deve subir — e melhor o site
+    ficar fora do ar do que ficar no ar sem tranca.
+
+    Chamada na inicializacao, em app/main.py.
+    """
+    problemas = []
+
+    if SECRET_KEY == SECRET_KEY_INSEGURA:
+        problemas.append(
+            "SECRET_KEY nao foi definida. O valor padrao esta publicado no "
+            "GitHub, e com ele qualquer pessoa consegue forjar um cookie de "
+            "sessao e entrar sem senha.\n"
+            "     COMO RESOLVER: gere uma chave nova com\n"
+            '       python -c "import secrets; print(secrets.token_hex(32))"\n'
+            "     e cadastre em SECRET_KEY (no .env, ou nas variaveis de "
+            "ambiente do servidor)."
+        )
+
+    if len(SECRET_KEY) < 32:
+        problemas.append(
+            f"SECRET_KEY curta demais ({len(SECRET_KEY)} caracteres). "
+            "Use ao menos 32 — quanto mais curta, mais facil de descobrir."
+        )
+
+    # Senhas de acesso iguais as do exemplo publico.
+    senhas_de_exemplo = {
+        "SENHA_ESTIPULANTE": "estipulante@sebraeprev",
+        "SENHA_CORRETORA": "corretora@sebraeprev",
+        "SENHA_SEGURADORA": "seguradora@sebraeprev",
+    }
+    atuais = {
+        "SENHA_ESTIPULANTE": SENHA_ESTIPULANTE,
+        "SENHA_CORRETORA": SENHA_CORRETORA,
+        "SENHA_SEGURADORA": SENHA_SEGURADORA,
+    }
+    iguais = [nome for nome, valor in atuais.items()
+              if valor == senhas_de_exemplo[nome]]
+    if iguais:
+        problemas.append(
+            f"Estas senhas continuam sendo as do exemplo publico: "
+            f"{', '.join(iguais)}. Elas estao no .env.example, dentro do "
+            f"repositorio. Troque antes de colocar no ar."
+        )
+
+    return problemas

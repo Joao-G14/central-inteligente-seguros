@@ -1826,6 +1826,50 @@ code {
   border-color: var(--red);
 }
 
+/* --- Navegacao entre paginas da tabela --- */
+.paginacao {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.paginacao a,
+.paginacao span {
+  padding: 7px 13px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.paginacao a {
+  color: var(--blue);
+  border: 1px solid var(--line);
+  background: #fff;
+  transition: .15s;
+}
+
+.paginacao a:hover {
+  background: var(--navy-sea);
+  border-color: var(--navy-sea);
+  color: #fff;
+}
+
+.paginacao .atual {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.paginacao .desativado {
+  color: var(--gray-steel);
+  border: 1px solid var(--linha-suave);
+  cursor: default;
+}
+
 /* Linha de dica embaixo de um painel */
 .dica {
   font-size: 12.5px;

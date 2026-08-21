@@ -1,4 +1,4 @@
-"""
+﻿"""
 assistente.py
 -------------
 O "assistente" da Central.
@@ -17,13 +17,14 @@ A vantagem de consultar o banco e que a resposta nunca fica velha:
 se uma apolice mudar de status, a resposta muda junto.
 """
 
+import html
 import re
 import unicodedata
 from datetime import date
 
 from sqlalchemy import func
 
-from app import ia_local
+from app import ia_local, tempo
 from app.models import Claim, Commission, Delinquency, Payment, Pendency, Policy, Proposal
 
 
@@ -43,6 +44,36 @@ def _reais(valor: float, casas: int = 2) -> str:
     """Formata no padrao brasileiro: 1234.5 vira 'R$ 1.234,50'."""
     texto = f"{valor:,.{casas}f}"
     return "R$ " + texto.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _e(valor) -> str:
+    """
+    Prepara um dado do banco para entrar no HTML da resposta.
+
+    POR QUE ISTO EXISTE — leia antes de mexer
+    -----------------------------------------
+    As respostas do assistente sao montadas em HTML (com <b>, <table>) e a
+    tela usa |safe para o navegador desenhar essa formatacao. Isso e
+    proposital, MAS tem um perigo: se um dado do banco contiver HTML, ele
+    tambem seria desenhado.
+
+    Um nome de participante como
+
+        <img src=x onerror="alert(1)">
+
+    entraria na planilha .xlsx sem problema, e depois seria EXECUTADO no
+    navegador de quem abrisse o assistente. Quem envia a planilha
+    conseguiria rodar codigo na sessao das outras pessoas.
+
+    Esta funcao troca os caracteres perigosos (< > & " ') pelos codigos
+    equivalentes, entao o navegador mostra o texto em vez de executar.
+
+    REGRA: todo dado que vem do BANCO passa por aqui antes de entrar numa
+    resposta. Texto que nos mesmos escrevemos no codigo nao precisa.
+    """
+    if valor is None:
+        return ""
+    return html.escape(str(valor), quote=True)
 
 
 def _contem(texto: str, palavra: str) -> bool:
@@ -72,7 +103,7 @@ def _alguma(texto: str, palavras: list[str]) -> bool:
 
 
 def _renovacoes(db) -> str:
-    hoje = date.today()
+    hoje = tempo.hoje()
     apolices = (
         db.query(Policy)
         .filter(Policy.status == "A renovar")
@@ -84,7 +115,7 @@ def _renovacoes(db) -> str:
         return "Não há nenhuma apólice com renovação nos próximos 30 dias. 🎉"
 
     linhas = "".join(
-        f"<tr><td>{a.numero_apolice}</td><td>{a.participante}</td>"
+        f"<tr><td>{_e(a.numero_apolice)}</td><td>{_e(a.participante)}</td>"
         f"<td>{a.data_vencimento.strftime('%d/%m')} "
         f"({a.dias_para_vencer(hoje)} dias)</td></tr>"
         for a in apolices
@@ -114,7 +145,7 @@ def _capital(db) -> str:
     if por_cobertura:
         maior, qtd = por_cobertura[0]
         pct = round(qtd * 100 / ativas) if ativas else 0
-        detalhe = f" A maior concentração está em <b>{maior}</b> ({pct}%)."
+        detalhe = f" A maior concentração está em <b>{_e(maior)}</b> ({pct}%)."
 
     return (
         f"O <b>capital segurado total</b> da carteira é {_reais(total, 0)}, "
@@ -128,7 +159,7 @@ def _sinistros(db) -> str:
         return "Não há sinistros registrados no momento."
 
     pendentes = db.query(Claim).filter(Claim.documentacao_ok.is_(False)).all()
-    hoje = date.today()
+    hoje = tempo.hoje()
     dias = [c.dias_em_aberto(hoje) for c in db.query(Claim).all()]
     media = round(sum(dias) / len(dias), 1)
 
@@ -137,7 +168,7 @@ def _sinistros(db) -> str:
         f"é de <b>{str(media).replace('.', ',')} dias</b>."
     )
     if pendentes:
-        lista = ", ".join(f"{c.protocolo} ({c.documentacao.lower()})" for c in pendentes)
+        lista = ", ".join(f"{_e(c.protocolo)} ({_e(c.documentacao.lower())})" for c in pendentes)
         texto += f"<br><br>⚠️ <b>{len(pendentes)}</b> com documentação pendente: {lista}."
     return texto
 
@@ -151,7 +182,7 @@ def _inadimplencia(db) -> str:
     em_risco = [d for d in registros if d.dias_atraso > 90]
 
     linhas = "".join(
-        f"<tr><td>{d.participante}</td><td>{d.numero_apolice}</td>"
+        f"<tr><td>{_e(d.participante)}</td><td>{_e(d.numero_apolice)}</td>"
         f"<td>{d.dias_atraso} dias</td><td>{_reais(d.valor)}</td></tr>"
         for d in registros[:5]
     )
@@ -178,12 +209,12 @@ def _comissoes(db) -> str:
     premio = registros[0].premio_total if registros else 0
 
     linhas = "".join(
-        f"<tr><td>{c.quem}</td><td>{int(c.percentual)}%</td>"
+        f"<tr><td>{_e(c.quem)}</td><td>{int(c.percentual)}%</td>"
         f"<td>{_reais(c.valor, 0)}</td></tr>"
         for c in registros
     )
     return (
-        f"Na competência <b>{competencia}</b>, sobre o prêmio de "
+        f"Na competência <b>{_e(competencia)}</b>, sobre o prêmio de "
         f"<b>{_reais(premio, 0)}</b>, a divisão de comissões é:<table>"
         f"<tr><th>Agente</th><th>%</th><th>Valor</th></tr>{linhas}</table>"
     )
@@ -196,7 +227,7 @@ def _pendencias(db) -> str:
 
     abertas.sort(key=lambda p: (p.peso_prioridade(), p.prazo or date.max))
     linhas = "".join(
-        f"<tr><td>{p.prioridade}</td><td>{p.titulo}</td>"
+        f"<tr><td>{_e(p.prioridade)}</td><td>{_e(p.titulo)}</td>"
         f"<td>{p.prazo.strftime('%d/%m') if p.prazo else '—'}</td></tr>"
         for p in abertas[:3]
     )
@@ -220,16 +251,16 @@ def _pagamentos(db) -> str:
     for p in registros:
         contagem[p.status] = contagem.get(p.status, 0) + 1
 
-    resumo = ", ".join(f"<b>{qtd}</b> {status.lower()}" for status, qtd in contagem.items())
+    resumo = ", ".join(f"<b>{qtd}</b> {_e(status.lower())}" for status, qtd in contagem.items())
     atrasados = [p.segurado for p in registros if p.status == "Em atraso"]
 
     texto = (
-        f"Na competência <b>{competencia}</b> a base tem "
+        f"Na competência <b>{_e(competencia)}</b> a base tem "
         f"<b>{len(registros)} segurados</b>, com prêmio total de "
         f"<b>{_reais(total_premio)}</b>.<br>Pagamentos: {resumo}."
     )
     if atrasados:
-        texto += f"<br><br>⚠️ Em atraso: <b>{', '.join(atrasados)}</b>."
+        texto += f"<br><br>⚠️ Em atraso: <b>{', '.join(_e(a) for a in atrasados)}</b>."
     return texto
 
 
@@ -255,7 +286,7 @@ def _esteira(db) -> str:
     pendentes = [p for p in registros if p.etapa == "pendente" and not p.recusada]
     if pendentes:
         p = pendentes[0]
-        texto += f"<br><br>A pendência ativa é a <b>{p.numero} ({p.participante})</b>: {p.observacao}."
+        texto += f"<br><br>A pendência ativa é a <b>{_e(p.numero)} ({_e(p.participante)})</b>: {_e(p.observacao)}."
     if recusadas:
         texto += f"<br>Foram recusadas <b>{len(recusadas)}</b> proposta(s)."
     return texto
@@ -274,7 +305,7 @@ def _apolices_por_status(db) -> str:
 
     total = sum(q for _, q in por_status)
     linhas = "".join(
-        f"<tr><td>{s}</td><td>{q}</td><td>{q * 100 / total:.0f}%</td></tr>"
+        f"<tr><td>{_e(s)}</td><td>{q}</td><td>{q * 100 / total:.0f}%</td></tr>"
         for s, q in por_status
     )
     return (
@@ -342,7 +373,7 @@ def _convenios(db) -> str:
         boleto = next((b for b in a_emitir if b.agreement_id == c.id), None)
         if boleto:
             linhas += (
-                f"<tr><td>{c.nome}</td><td>{boleto.vidas:,}</td>"
+                f"<tr><td>{_e(c.nome)}</td><td>{boleto.vidas:,}</td>"
                 f"<td>{_reais(boleto.valor, 0)}</td></tr>"
             ).replace(",", ".")
 
@@ -395,7 +426,7 @@ def _apolices_carteira(db) -> str:
     por_status = (
         db.query(Policy.status, func.count(Policy.id)).group_by(Policy.status).all()
     )
-    linhas = "".join(f"<tr><td>{s}</td><td>{q}</td></tr>" for s, q in por_status)
+    linhas = "".join(f"<tr><td>{_e(s)}</td><td>{q}</td></tr>" for s, q in por_status)
     return (
         f"A carteira tem <b>{total} apólices</b>, assim distribuídas:"
         f"<table><tr><th>Status</th><th>Quantidade</th></tr>{linhas}</table>"
@@ -861,7 +892,7 @@ def _sistema_tecnologia(_db) -> str:
 
 
 def _sistema_assistente(_db) -> str:
-    from app import ia_local
+    from app import ia_local, tempo
 
     info = ia_local.informacoes()
     return (
@@ -1243,15 +1274,15 @@ def _detalhe_apolice(db, numero: str) -> str:
         prazo = f"vence em {dias} dia(s)"
 
     return (
-        f"<b>Apólice {apolice.numero_apolice}</b><br><br>"
+        f"<b>Apólice {_e(apolice.numero_apolice)}</b><br><br>"
         f"<table>"
-        f"<tr><td>Participante</td><td><b>{apolice.participante}</b></td></tr>"
-        f"<tr><td>Cobertura</td><td>{apolice.cobertura}</td></tr>"
+        f"<tr><td>Participante</td><td><b>{_e(apolice.participante)}</b></td></tr>"
+        f"<tr><td>Cobertura</td><td>{_e(apolice.cobertura)}</td></tr>"
         f"<tr><td>Capital segurado</td><td>{_reais(apolice.capital_total, 0)}</td></tr>"
         f"<tr><td>Prêmio mensal</td><td>{_reais(apolice.premio_mensal)}</td></tr>"
         f"<tr><td>Vigência</td><td>{apolice.data_inicio.strftime('%d/%m/%Y')} "
         f"a {apolice.data_vencimento.strftime('%d/%m/%Y')}</td></tr>"
-        f"<tr><td>Situação</td><td><b>{apolice.status}</b> — {prazo}</td></tr>"
+        f"<tr><td>Situação</td><td><b>{_e(apolice.status)}</b> — {prazo}</td></tr>"
         f"</table>"
     )
 
@@ -1266,14 +1297,14 @@ def _detalhe_sinistro(db, protocolo: str) -> str:
 
     alerta = "" if sinistro.documentacao_ok else "<br><br>⚠️ Este processo está parado por falta de documento."
     return (
-        f"<b>Sinistro {sinistro.protocolo}</b><br><br>"
+        f"<b>Sinistro {_e(sinistro.protocolo)}</b><br><br>"
         f"<table>"
-        f"<tr><td>Participante</td><td><b>{sinistro.participante}</b></td></tr>"
-        f"<tr><td>Tipo</td><td>{sinistro.tipo}</td></tr>"
+        f"<tr><td>Participante</td><td><b>{_e(sinistro.participante)}</b></td></tr>"
+        f"<tr><td>Tipo</td><td>{_e(sinistro.tipo)}</td></tr>"
         f"<tr><td>Aberto em</td><td>{sinistro.data_abertura.strftime('%d/%m/%Y')} "
         f"({sinistro.dias_em_aberto()} dias)</td></tr>"
-        f"<tr><td>Documentação</td><td>{sinistro.documentacao}</td></tr>"
-        f"<tr><td>Situação</td><td><b>{sinistro.status}</b></td></tr>"
+        f"<tr><td>Documentação</td><td>{_e(sinistro.documentacao)}</td></tr>"
+        f"<tr><td>Situação</td><td><b>{_e(sinistro.status)}</b></td></tr>"
         f"</table>{alerta}"
     )
 
@@ -1294,16 +1325,16 @@ def _detalhe_proposta(db, numero: str) -> str:
     }
     situacao = "Recusada" if proposta.recusada else etapas.get(proposta.etapa, proposta.etapa)
 
-    linhas = f"<tr><td>Participante</td><td><b>{proposta.participante}</b></td></tr>"
+    linhas = f"<tr><td>Participante</td><td><b>{_e(proposta.participante)}</b></td></tr>"
     if proposta.cobertura:
-        linhas += f"<tr><td>Cobertura</td><td>{proposta.cobertura}</td></tr>"
+        linhas += f"<tr><td>Cobertura</td><td>{_e(proposta.cobertura)}</td></tr>"
     if proposta.capital:
         linhas += f"<tr><td>Capital</td><td>{_reais(proposta.capital, 0)}</td></tr>"
     linhas += f"<tr><td>Etapa</td><td><b>{situacao}</b></td></tr>"
     if proposta.observacao:
-        linhas += f"<tr><td>Observação</td><td>{proposta.observacao}</td></tr>"
+        linhas += f"<tr><td>Observação</td><td>{_e(proposta.observacao)}</td></tr>"
 
-    return f"<b>Proposta {proposta.numero}</b><br><br><table>{linhas}</table>"
+    return f"<b>Proposta {_e(proposta.numero)}</b><br><br><table>{linhas}</table>"
 
 
 # Palavras que provam que a pergunta e do nosso mundo, mesmo que ela

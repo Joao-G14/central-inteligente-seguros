@@ -1,4 +1,4 @@
-"""
+﻿"""
 api.py
 ------
 A API da Central de Seguros.
@@ -39,12 +39,12 @@ endereco, sem instalar nada.
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app import config
+from app import config, tempo
 from app.database import get_db
 from app.models import Claim, Commission, Delinquency, Payment, Pendency, Policy, Proposal
 
@@ -57,24 +57,62 @@ router = APIRouter(prefix="/api/v1", tags=["API de integração"])
 # ===============================================================
 # AUTENTICACAO DA API
 # ===============================================================
-def conferir_chave(x_api_key: str = Header(default="")) -> None:
+def conferir_chave(
+    request: Request,
+    x_api_key: str = Header(default=""),
+    db: Session = Depends(get_db),
+) -> None:
     """
     Confere o cabecalho X-API-Key de cada pedido.
 
     O nome do parametro (x_api_key) vira o nome do cabecalho (X-API-Key):
     o FastAPI troca o "_" por "-" sozinho.
-    """
-    if not config.API_KEY:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "A API está desligada: nenhuma API_KEY foi configurada. "
-                "Defina API_KEY no arquivo .env (ou nas variáveis do servidor)."
-            ),
-        )
 
-    if x_api_key != config.API_KEY:
-        raise HTTPException(status_code=401, detail="Chave de API inválida ou ausente.")
+    A conferencia tem DOIS caminhos:
+      1. as chaves cadastradas na tabela api_keys (uma por parceiro)
+      2. a chave unica do .env, que continua valendo para nao quebrar
+         quem ja estava usando
+
+    E TODA chamada e registrada na tabela api_calls — inclusive as
+    recusadas, que sao justamente as que interessa investigar.
+    """
+    from app.auth import conferir_senha
+    from app.models import ApiCall, ApiKey
+
+    caminho = request.url.path
+    metodo = request.method
+    ip = request.client.host if request.client else None
+
+    def registrar(status: int, parceiro: str | None, chave_id: int | None,
+                  resumo: str | None = None):
+        db.add(ApiCall(api_key_id=chave_id, parceiro=parceiro, metodo=metodo,
+                       caminho=caminho, status=status, ip=ip, resumo=resumo))
+        db.commit()
+
+    if not x_api_key:
+        registrar(401, None, None, "sem o cabecalho X-API-Key")
+        raise HTTPException(status_code=401, detail="Chave de API ausente.")
+
+    # --- 1. procura entre as chaves cadastradas ---
+    # Guardamos o hash, nao a chave, entao comparamos uma por uma. Sao
+    # poucas (uma por parceiro), o custo e irrelevante.
+    for registro in db.query(ApiKey).filter(ApiKey.ativo.is_(True)).all():
+        if conferir_senha(x_api_key, registro.chave_hash):
+            registro.ultimo_uso = tempo.agora()
+            db.commit()
+            registrar(200, registro.nome, registro.id)
+            return
+
+    # --- 2. a chave unica do .env ---
+    if config.API_KEY and x_api_key == config.API_KEY:
+        registrar(200, "chave do .env", None)
+        return
+
+    # --- 3. nao bateu com nenhuma ---
+    # Guardamos so o INICIO da chave tentada: o suficiente para
+    # investigar, sem gravar uma credencial inteira no banco.
+    registrar(401, None, None, f"chave invalida (inicio: {x_api_key[:8]}...)")
+    raise HTTPException(status_code=401, detail="Chave de API inválida.")
 
 
 # Todo endereco deste arquivo passa por conferir_chave antes de responder.
@@ -133,7 +171,7 @@ def status(db: Session = Depends(get_db)):
     """Resumo rápido do sistema. Serve para monitoramento."""
     return {
         "situacao": "no ar",
-        "data": date.today().isoformat(),
+        "data": tempo.hoje().isoformat(),
         "totais": {
             "apolices": db.query(Policy).count(),
             "apolices_ativas": db.query(Policy).filter(Policy.status == "Ativa").count(),
@@ -161,9 +199,9 @@ def listar_apolices(
         consulta = consulta.filter(Policy.status == status)
 
     if vencendo_em is not None:
-        limite_data = date.today() + __import__("datetime").timedelta(days=vencendo_em)
+        limite_data = tempo.hoje() + __import__("datetime").timedelta(days=vencendo_em)
         consulta = consulta.filter(
-            Policy.data_vencimento >= date.today(),
+            Policy.data_vencimento >= tempo.hoje(),
             Policy.data_vencimento <= limite_data,
         )
 
@@ -291,7 +329,7 @@ def indicadores(db: Session = Depends(get_db)):
     ).scalar() or 0
 
     return {
-        "data": date.today().isoformat(),
+        "data": tempo.hoje().isoformat(),
         "apolices_ativas": db.query(Policy).filter(Policy.status == "Ativa").count(),
         "apolices_a_renovar": db.query(Policy).filter(Policy.status == "A renovar").count(),
         "capital_segurado": round(capital, 2),

@@ -100,12 +100,28 @@ MENU = [
         "pronto": True,
     },
     {
-        # Tela de administracao: so o ESTIPULANTE enxerga.
+        # Telas de administracao: so o ESTIPULANTE enxerga.
         # A regra esta em MODULOS_BLOQUEADOS, no app/auth.py.
+        # As tres usam a mesma chave "acessos", entao a mesma regra de
+        # permissao vale para todas.
         "chave": "acessos",
         "titulo": "Controle de Acesso",
         "url": "/acessos",
         "icone": '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+        "pronto": True,
+    },
+    {
+        "chave": "acessos",
+        "titulo": "Chaves da API",
+        "url": "/api-chaves",
+        "icone": '<path d="M21 2l-2 2m-7.6 7.6a5 5 0 1 1-7.1 7.1 5 5 0 0 1 7.1-7.1zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3"/>',
+        "pronto": True,
+    },
+    {
+        "chave": "acessos",
+        "titulo": "Trocar senha",
+        "url": "/senha",
+        "icone": '<rect x="3" y="11" width="18" height="11" rx="2"/><circle cx="12" cy="16" r="1"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
         "pronto": True,
     },
 ]

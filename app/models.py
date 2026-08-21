@@ -1,4 +1,4 @@
-"""
+﻿"""
 models.py
 ---------
 Aqui descrevemos as TABELAS do banco de dados usando classes Python.
@@ -9,7 +9,7 @@ Cada Column = uma coluna.
 O SQLAlchemy le este arquivo e cria as tabelas de verdade no central.db.
 """
 
-from datetime import date, datetime
+from datetime import date, datetime  # noqa: F401  (date e usado nas anotacoes)
 
 from sqlalchemy import (
     Boolean,
@@ -24,6 +24,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
+from app import tempo
 from app.database import Base
 
 # ---------------------------------------------------------------
@@ -63,7 +64,7 @@ class User(Base):
     # Se ativo=False, o usuario existe mas nao consegue entrar.
     ativo = Column(Boolean, nullable=False, default=True)
 
-    criado_em = Column(DateTime, nullable=False, default=datetime.now)
+    criado_em = Column(DateTime, nullable=False, default=tempo.agora)
 
     # Liga este usuario aos seus registros de login.
     # Permite escrever: usuario.logins  -> lista de acessos dele
@@ -101,7 +102,7 @@ class LoginHistory(Base):
     ip = Column(String(45), nullable=True)
 
     # A data e hora do acesso. Este e o requisito principal desta tabela.
-    data_hora = Column(DateTime, nullable=False, default=datetime.now)
+    data_hora = Column(DateTime, nullable=False, default=tempo.agora)
 
     usuario = relationship("User", back_populates="logins")
 
@@ -168,7 +169,7 @@ class Policy(Base):
     # Ajuda voces a rastrear os dados enquanto estudam o projeto.
     origem = Column(String(20), nullable=True)
 
-    criado_em = Column(DateTime, nullable=False, default=datetime.now)
+    criado_em = Column(DateTime, nullable=False, default=tempo.agora)
 
     def __repr__(self):
         return f"<Policy {self.numero_apolice} {self.participante} {self.status}>"
@@ -191,6 +192,55 @@ class Policy(Base):
         return f"R$ {self.premio_mensal:,.2f}".replace(",", "X").replace(
             ".", ","
         ).replace("X", ".")
+
+
+# ===============================================================
+# TABELA 2b: active_sessions  (quem esta logado agora)
+# ===============================================================
+class ActiveSession(Base):
+    """
+    Uma linha por pessoa logada.
+
+    POR QUE ISTO EXISTE
+    -------------------
+    Antes, o cookie carregava so o numero da categoria. Ele era assinado,
+    entao ninguem conseguia falsifica-lo — mas quem COPIASSE um cookie
+    valido (num PC compartilhado, por exemplo) continuaria entrando por
+    8 horas, inclusive depois de a pessoa clicar em "Sair". O logout so
+    apagava o cookie do navegador dela, nao invalidava o cracha.
+
+    Agora o cookie carrega apenas um CODIGO ALEATORIO, e a sessao de
+    verdade mora aqui. O logout APAGA esta linha — e qualquer copia do
+    cookie morre na hora.
+
+    Bonus: como cada pessoa tem a sua linha, o logout de uma nao derruba
+    as outras. Isso importa porque a senha e compartilhada por categoria:
+    varias pessoas usam a mesma conta ao mesmo tempo.
+    """
+
+    __tablename__ = "active_sessions"
+
+    id = Column(Integer, primary_key=True)
+
+    # O codigo aleatorio que vai dentro do cookie. E a "chave" da sessao.
+    token = Column(String(64), unique=True, nullable=False, index=True)
+
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # O e-mail que a pessoa digitou ao entrar.
+    email = Column(String(120), nullable=False)
+    ip = Column(String(45), nullable=True)
+
+    criado_em = Column(DateTime, nullable=False, default=tempo.agora)
+
+    # Atualizado a cada pagina aberta. Serve para saber quem esta
+    # realmente ativo e para expirar sessoes esquecidas.
+    ultimo_acesso = Column(DateTime, nullable=False, default=tempo.agora)
+
+    usuario = relationship("User")
+
+    def __repr__(self):
+        return f"<ActiveSession {self.email} desde {self.criado_em}>"
 
 
 # ===============================================================
@@ -238,7 +288,7 @@ class AuthorizedEmail(Base):
 
     # Quem cadastrou e quando.
     cadastrado_por = Column(String(120), nullable=True)
-    criado_em = Column(DateTime, nullable=False, default=datetime.now)
+    criado_em = Column(DateTime, nullable=False, default=tempo.agora)
 
     def __repr__(self):
         return f"<AuthorizedEmail {self.valor} ({self.perfil})>"
@@ -264,6 +314,111 @@ class AuthorizedEmail(Base):
 
 
 # ===============================================================
+# TABELA 3e: api_keys  (uma chave para cada parceiro)
+# ===============================================================
+class ApiKey(Base):
+    """
+    Uma chave de acesso a API, por parceiro.
+
+    POR QUE UMA CHAVE PARA CADA UM
+    ------------------------------
+    Antes havia uma unica chave no arquivo .env, usada por todos. Isso
+    trazia dois problemas:
+
+      1. se a chave da corretora vazasse, era preciso trocar a de todos
+         os parceiros ao mesmo tempo
+      2. nao havia como saber QUEM fez cada chamada
+
+    Com uma chave por parceiro, da para revogar so a dele e o registro
+    de chamadas mostra o nome de quem chamou.
+
+    POR QUE GUARDAMOS O HASH, E NAO A CHAVE
+    ---------------------------------------
+    Igual as senhas: se o banco cair em maos erradas, ninguem consegue
+    usar as chaves. A chave completa aparece UMA VEZ, na tela, no momento
+    em que e criada. Depois disso nem nos conseguimos ver — se a pessoa
+    perder, e preciso gerar outra.
+
+    Guardamos separado um "inicio" (os 8 primeiros caracteres) apenas
+    para dar para identificar qual chave e qual na lista.
+    """
+
+    __tablename__ = "api_keys"
+
+    id = Column(Integer, primary_key=True)
+
+    # Quem usa esta chave: "Corretora Parceira", "ICATU", "Copilot"...
+    nome = Column(String(80), unique=True, nullable=False)
+
+    # O hash da chave (nunca a chave em si).
+    chave_hash = Column(String(200), nullable=False)
+
+    # Os primeiros caracteres, para identificar na lista.
+    inicio = Column(String(12), nullable=False)
+
+    observacao = Column(String(200), nullable=True)
+
+    # Bloquear em vez de apagar preserva o historico de chamadas.
+    ativo = Column(Boolean, nullable=False, default=True)
+
+    criado_por = Column(String(120), nullable=True)
+    criado_em = Column(DateTime, nullable=False, default=tempo.agora)
+    ultimo_uso = Column(DateTime, nullable=True)
+
+    def __repr__(self):
+        return f"<ApiKey {self.nome} ({self.inicio}...)>"
+
+
+# ===============================================================
+# TABELA 3f: api_calls  (registro de quem chamou a API)
+# ===============================================================
+class ApiCall(Base):
+    """
+    Uma linha por chamada recebida na API.
+
+    POR QUE ISTO EXISTE
+    -------------------
+    O login guardava tudo, mas a API nao guardava nada. Se a corretora
+    dissesse "enviei a base ontem", nao havia como conferir. Agora da
+    para responder: quem chamou, quando, de onde, o que pediu e se deu
+    certo.
+
+    Isto tambem serve para perceber uso indevido: muitas chamadas
+    recusadas seguidas costumam ser alguem tentando adivinhar a chave.
+    """
+
+    __tablename__ = "api_calls"
+
+    id = Column(Integer, primary_key=True)
+
+    # Qual parceiro chamou. Fica vazio quando a chave era invalida —
+    # e justamente esse caso que interessa investigar.
+    api_key_id = Column(Integer, ForeignKey("api_keys.id"), nullable=True)
+    parceiro = Column(String(80), nullable=True)
+
+    metodo = Column(String(10), nullable=False)   # GET, POST...
+    caminho = Column(String(200), nullable=False)  # /api/v1/apolices
+    status = Column(Integer, nullable=False)       # 200, 401, 422...
+
+    ip = Column(String(45), nullable=True)
+
+    # Quanto tempo a Central levou para responder, em milissegundos.
+    duracao_ms = Column(Integer, nullable=True)
+
+    # Um resumo curto do que aconteceu. Ex.: "10 registros gravados".
+    # NAO guardamos o conteudo enviado: a base tem CPF e nome, e guardar
+    # duas vezes o mesmo dado pessoal aumenta o risco sem necessidade.
+    resumo = Column(String(200), nullable=True)
+
+    data_hora = Column(DateTime, nullable=False, default=tempo.agora, index=True)
+
+    chave = relationship("ApiKey")
+
+    def __repr__(self):
+        return f"<ApiCall {self.metodo} {self.caminho} -> {self.status}>"
+
+
+# ===============================================================
 # TABELA 3c: settings  (configuracoes que mudam pela tela)
 # ===============================================================
 class Setting(Base):
@@ -281,7 +436,7 @@ class Setting(Base):
     id = Column(Integer, primary_key=True)
     chave = Column(String(60), unique=True, nullable=False, index=True)
     valor = Column(String(200), nullable=False, default="")
-    atualizado_em = Column(DateTime, nullable=False, default=datetime.now)
+    atualizado_em = Column(DateTime, nullable=False, default=tempo.agora)
 
     def __repr__(self):
         return f"<Setting {self.chave}={self.valor}>"
@@ -324,7 +479,7 @@ class ChatMessage(Base):
     # Fica so nas respostas; nas perguntas da pessoa e None.
     origem = Column(String(10), nullable=True)
 
-    criado_em = Column(DateTime, nullable=False, default=datetime.now, index=True)
+    criado_em = Column(DateTime, nullable=False, default=tempo.agora, index=True)
 
     def __repr__(self):
         return f"<ChatMessage {self.papel}: {self.conteudo[:40]}>"
@@ -361,7 +516,7 @@ class Payment(Base):
     # "Pago", "A pagar" ou "Em atraso"
     status = Column(String(20), nullable=False, index=True)
 
-    criado_em = Column(DateTime, nullable=False, default=datetime.now)
+    criado_em = Column(DateTime, nullable=False, default=tempo.agora)
 
     def __repr__(self):
         return f"<Payment {self.matricula} {self.segurado} {self.status}>"

@@ -1,4 +1,4 @@
-"""
+﻿"""
 assistente_ia.py
 ----------------
 O assistente com INTELIGENCIA ARTIFICIAL de verdade.
@@ -40,7 +40,7 @@ from datetime import date
 
 from sqlalchemy import func
 
-from app import config
+from app import config, tempo
 from app.database import SessionLocal
 from app.models import (
     Claim,
@@ -106,7 +106,7 @@ def resumo_da_carteira() -> str:
         ).scalar() or 0
 
         return _json({
-            "data_de_hoje": date.today().isoformat(),
+            "data_de_hoje": tempo.hoje().isoformat(),
             "apolices_por_status": por_status,
             "apolices_total": sum(por_status.values()),
             "capital_segurado_ativas_reais": round(capital, 2),
@@ -150,9 +150,9 @@ def buscar_apolices(
             consulta = consulta.filter(Policy.capital_total >= capital_minimo)
         if vencendo_em_dias > 0:
             from datetime import timedelta
-            limite_data = date.today() + timedelta(days=vencendo_em_dias)
+            limite_data = tempo.hoje() + timedelta(days=vencendo_em_dias)
             consulta = consulta.filter(
-                Policy.data_vencimento >= date.today(),
+                Policy.data_vencimento >= tempo.hoje(),
                 Policy.data_vencimento <= limite_data,
             )
 

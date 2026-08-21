@@ -17,13 +17,15 @@ hash NAO da para voltar para a senha.
 """
 
 import re
+from datetime import timedelta
 
 import bcrypt
 from itsdangerous import BadSignature, URLSafeSerializer
 
-from app import config
+from app import config, tempo
 from app.models import (
     CHAVE_EXIGIR_AUTORIZACAO,
+    ActiveSession,
     AuthorizedEmail,
     LoginHistory,
     Setting,
@@ -177,6 +179,84 @@ def exigir_autorizacao(db) -> bool:
     return config_banco is not None and config_banco.valor == "sim"
 
 
+# ===============================================================
+# PROTECAO CONTRA FORCA BRUTA
+# ===============================================================
+# "Forca bruta" e quando um programa testa milhares de senhas em
+# sequencia ate acertar. Sem protecao, isso funciona: um computador
+# comum testa mais senhas por minuto do que uma pessoa em um ano.
+#
+# Nossa protecao: contar as tentativas FALHADAS que vieram do mesmo
+# endereco (IP) nos ultimos minutos. Passando do limite, recusamos por
+# um tempo — mesmo que a senha esteja certa.
+#
+# Nao guardamos isso em memoria de proposito: usamos a tabela
+# login_history, que ja registra tudo. Assim a protecao continua
+# valendo depois de reiniciar o servidor.
+
+# Quantas falhas seguidas o mesmo IP pode ter...
+LIMITE_DE_TENTATIVAS = 8
+
+# ...dentro de quantos minutos.
+JANELA_DE_MINUTOS = 10
+
+# Por quantos minutos ele fica bloqueado depois de passar do limite.
+BLOQUEIO_EM_MINUTOS = 15
+
+
+def tentativas_recentes(db, ip: str | None) -> int:
+    """Quantas falhas de login este IP teve na janela de tempo."""
+    if not ip:
+        return 0
+
+    limite = tempo.agora() - timedelta(minutes=JANELA_DE_MINUTOS)
+    return (
+        db.query(LoginHistory)
+        .filter(
+            LoginHistory.ip == ip,
+            LoginHistory.sucesso.is_(False),
+            LoginHistory.data_hora >= limite,
+        )
+        .count()
+    )
+
+
+def esta_bloqueado(db, ip: str | None) -> tuple[bool, int]:
+    """
+    Este endereco esta bloqueado por tentar demais?
+
+    Devolve DOIS valores:
+      - True/False
+      - quantos minutos faltam para liberar
+
+    A conta e simples: se houve muitas falhas na janela, olhamos a hora
+    da ULTIMA falha. Enquanto ela estiver dentro do periodo de bloqueio,
+    continua barrado.
+    """
+    if not ip:
+        return False, 0
+
+    if tentativas_recentes(db, ip) < LIMITE_DE_TENTATIVAS:
+        return False, 0
+
+    ultima = (
+        db.query(LoginHistory)
+        .filter(LoginHistory.ip == ip, LoginHistory.sucesso.is_(False))
+        .order_by(LoginHistory.data_hora.desc())
+        .first()
+    )
+    if ultima is None:
+        return False, 0
+
+    libera_em = ultima.data_hora + timedelta(minutes=BLOQUEIO_EM_MINUTOS)
+    faltam = (libera_em - tempo.agora()).total_seconds() / 60
+
+    if faltam <= 0:
+        return False, 0
+
+    return True, max(1, int(faltam) + 1)
+
+
 def email_autorizado(db, email: str, perfil: str) -> bool:
     """
     Percorre a lista de acesso e responde se este e-mail pode entrar
@@ -237,15 +317,76 @@ NOME_DO_COOKIE = "sessao_central"
 _assinador = URLSafeSerializer(config.SECRET_KEY, salt="sessao-central-seguros")
 
 
-def criar_cookie_sessao(resposta, usuario: User, email: str = "") -> None:
+# Depois de quantas horas sem uso a sessao expira.
+HORAS_DE_SESSAO = 8
+
+
+def abrir_sessao(db, usuario: User, email: str, ip: str | None = None) -> str:
+    """
+    Cria a sessao no banco e devolve o codigo que vai no cookie.
+
+    O codigo e sorteado com secrets.token_urlsafe, que gera valores
+    impossiveis de adivinhar. Ele nao carrega nenhuma informacao: e so
+    uma chave para achar a linha na tabela.
+    """
+    import secrets
+
+    # Aproveita para limpar sessoes velhas, para a tabela nao crescer
+    # sem parar.
+    limite = tempo.agora() - timedelta(hours=HORAS_DE_SESSAO)
+    db.query(ActiveSession).filter(ActiveSession.ultimo_acesso < limite).delete()
+
+    token = secrets.token_urlsafe(32)
+    db.add(ActiveSession(token=token, user_id=usuario.id, email=email, ip=ip))
+    db.commit()
+    return token
+
+
+def fechar_sessao(db, request) -> None:
+    """
+    Apaga a sessao deste navegador. E o logout de verdade.
+
+    Como a linha desaparece do banco, qualquer copia do cookie para de
+    funcionar na mesma hora. E como apagamos SO esta linha, as outras
+    pessoas que estao usando a mesma categoria continuam trabalhando.
+    """
+    dados = _abrir_cookie(request)
+    if not dados:
+        return
+
+    token = dados.get("token")
+    if token:
+        db.query(ActiveSession).filter(ActiveSession.token == token).delete()
+        db.commit()
+
+
+def encerrar_todas_as_sessoes(db, perfil: str) -> int:
+    """
+    Derruba TODAS as sessoes de uma categoria.
+
+    Use quando a senha vazar: todo mundo daquela categoria e obrigado a
+    entrar de novo. Devolve quantas sessoes foram encerradas.
+    """
+    conta = db.query(User).filter(User.perfil == perfil).first()
+    if conta is None:
+        return 0
+
+    quantas = db.query(ActiveSession).filter(
+        ActiveSession.user_id == conta.id
+    ).delete()
+    db.commit()
+    return quantas
+
+
+def criar_cookie_sessao(resposta, token: str) -> None:
     """
     Coloca o cracha assinado na resposta que vai para o navegador.
 
-    Guardamos duas coisas: a categoria (user_id) e o e-mail que a pessoa
-    digitou. O e-mail aparece no canto da tela, para quem estiver usando
-    saber com qual identificacao entrou.
+    O cracha carrega apenas o CODIGO da sessao. Nenhum dado da pessoa
+    viaja no cookie — quem sabe o codigo acha a sessao no banco, e mais
+    nada.
     """
-    valor = _assinador.dumps({"user_id": usuario.id, "email": email})
+    valor = _assinador.dumps({"token": token})
     resposta.set_cookie(
         key=NOME_DO_COOKIE,
         value=valor,
@@ -272,28 +413,56 @@ def _abrir_cookie(request) -> dict | None:
         return None  # cookie adulterado ou assinado com outra chave
 
 
+def _achar_sessao(db, request) -> ActiveSession | None:
+    """Acha a sessao deste navegador, se ela existir e nao tiver expirado."""
+    dados = _abrir_cookie(request)
+    if not dados:
+        return None
+
+    token = dados.get("token")
+    if not token:
+        return None
+
+    sessao = db.query(ActiveSession).filter(ActiveSession.token == token).first()
+    if sessao is None:
+        return None  # ja fez logout, ou a sessao foi encerrada
+
+    # Expirou por inatividade?
+    if sessao.ultimo_acesso < tempo.agora() - timedelta(hours=HORAS_DE_SESSAO):
+        db.delete(sessao)
+        db.commit()
+        return None
+
+    return sessao
+
+
 def ler_usuario_do_cookie(db, request) -> User | None:
     """
     Le o cracha e devolve a categoria de acesso correspondente.
 
-    Devolve None se: nao ha cookie, a assinatura nao confere,
-    a categoria sumiu do banco ou esta inativa.
+    Devolve None se: nao ha cookie, a assinatura nao confere, a sessao
+    nao existe mais (logout), expirou, ou a categoria esta inativa.
     """
-    dados = _abrir_cookie(request)
-    if dados is None:
+    sessao = _achar_sessao(db, request)
+    if sessao is None:
         return None
 
-    usuario = db.query(User).filter(User.id == dados.get("user_id")).first()
+    usuario = sessao.usuario
     if usuario is None or not usuario.ativo:
         return None
+
+    # Marca que a pessoa continua ativa, para a sessao nao expirar
+    # enquanto ela estiver usando o sistema.
+    sessao.ultimo_acesso = tempo.agora()
+    db.commit()
 
     return usuario
 
 
-def ler_email_do_cookie(request) -> str:
+def ler_email_do_cookie(db, request) -> str:
     """Devolve o e-mail que a pessoa digitou ao entrar (ou vazio)."""
-    dados = _abrir_cookie(request)
-    return (dados or {}).get("email", "")
+    sessao = _achar_sessao(db, request)
+    return sessao.email if sessao else ""
 
 
 # ===============================================================

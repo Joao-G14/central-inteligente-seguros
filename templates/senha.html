@@ -1,0 +1,147 @@
+{# ==================================================================
+   senha.html — trocar a senha de uma categoria
+   ==================================================================
+   Tela exclusiva do ESTIPULANTE.
+
+   Antes desta tela, trocar uma senha exigia editar o arquivo .env no
+   servidor e reiniciar — o que dependia de alguem com acesso tecnico.
+   Se a senha vazasse numa sexta a noite, ficava vazada até segunda.
+   ================================================================== #}
+{% extends "base.html" %}
+
+{% block titulo %}Trocar senha — Central de Seguros{% endblock %}
+{% block cabecalho %}Trocar senha de acesso{% endblock %}
+{% block subcabecalho %}Cada categoria tem a sua senha, usada por todas as pessoas dela{% endblock %}
+
+{% block conteudo %}
+
+  {% if aviso %}<div class="sucesso"><b>✅ {{ aviso }}</b></div>{% endif %}
+  {% if erro %}<div class="erro-lista"><b>⚠️ {{ erro }}</b></div>{% endif %}
+
+  {# ---------- SITUAÇÃO DE CADA CATEGORIA ---------- #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>As três categorias</h3>
+        <p>Quantas pessoas estão logadas em cada uma agora</p>
+      </div>
+    </div>
+    <div class="tabela-rolagem">
+      <table>
+        <thead>
+          <tr>
+            <th>Categoria</th>
+            <th class="num">Sessões abertas</th>
+            <th>Criada em</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in contas %}
+            <tr>
+              <td><b>{{ c.perfil|capitalize }}</b></td>
+              <td class="num">
+                {% if sessoes.get(c.perfil) %}
+                  <span class="pill blue">{{ sessoes[c.perfil] }}</span>
+                {% else %}
+                  <span style="color:var(--muted)">ninguém</span>
+                {% endif %}
+              </td>
+              <td>{{ c.criado_em.strftime('%d/%m/%Y') }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {# ---------- O FORMULÁRIO ---------- #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Trocar uma senha</h3>
+        <p>É preciso saber a senha atual da categoria</p>
+      </div>
+    </div>
+
+    <form method="post" action="/senha/trocar">
+      <div class="form-linha" style="border:none;padding-bottom:0">
+        <div class="campo-linha" style="max-width:220px">
+          <label for="perfil">Categoria</label>
+          <select id="perfil" name="perfil" required>
+            {% for c in contas %}
+              <option value="{{ c.perfil }}">{{ c.perfil|capitalize }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="campo-linha">
+          <label for="senha_atual">Senha atual da categoria</label>
+          <input type="password" id="senha_atual" name="senha_atual" required
+                 autocomplete="current-password">
+        </div>
+      </div>
+
+      <div class="form-linha" style="border:none;padding-bottom:0">
+        <div class="campo-linha">
+          <label for="nova">Senha nova (mínimo 10 caracteres)</label>
+          <input type="password" id="nova" name="nova" required minlength="10"
+                 autocomplete="new-password">
+        </div>
+        <div class="campo-linha">
+          <label for="repetir">Repita a senha nova</label>
+          <input type="password" id="repetir" name="repetir" required minlength="10"
+                 autocomplete="new-password">
+        </div>
+      </div>
+
+      <div class="interruptor" style="margin-top:16px">
+        <div class="texto">
+          <label style="cursor:pointer;display:flex;gap:9px;align-items:flex-start">
+            <input type="checkbox" name="derrubar" value="sim" style="margin-top:3px">
+            <span>
+              <b>Derrubar todas as sessões desta categoria</b><br>
+              Todas as pessoas que estão usando esta categoria agora serão
+              desconectadas e terão que entrar de novo com a senha nova.
+              <b>Marque isto se a troca for por suspeita de vazamento.</b>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div style="margin-top:18px">
+        <button type="submit" class="btn-enviar">Trocar senha</button>
+      </div>
+    </form>
+
+    <p class="dica">
+      A senha nova <b>passa a valer na hora</b> e continua valendo depois de
+      reiniciar o servidor. Vale atualizar o <code>.env</code> também, para o
+      caso de o banco ser recriado algum dia.
+    </p>
+  </div>
+
+  {# ---------- O AVISO QUE IMPORTA ---------- #}
+  <div class="panel">
+    <div class="ph">
+      <div>
+        <h3>Um lembrete sobre senha compartilhada</h3>
+      </div>
+    </div>
+    <p style="font-size:13.5px;line-height:1.7;color:var(--ink)">
+      Neste sistema a senha é <b>da categoria</b>, não da pessoa. Isso traz
+      duas consequências que vale ter em mente:
+    </p>
+    <ul style="font-size:13.5px;line-height:1.8;color:var(--ink);margin:12px 0 12px 22px">
+      <li>Para tirar o acesso de <b>uma</b> pessoa, é preciso trocar a senha de
+        <b>todas</b> as daquela categoria — e avisar as outras.</li>
+      <li>O e-mail registrado no histórico é o que a pessoa digitou, e o
+        sistema não confere se é dela de verdade.</li>
+    </ul>
+    <p style="font-size:13.5px;line-height:1.7;color:var(--muted)">
+      Para reduzir o risco, use o <b>Controle de Acesso</b> e ligue a
+      exigência da lista: aí só entra quem estiver autorizado, além de
+      saber a senha. Se um dia o registro de acesso precisar valer como
+      prova formal, o caminho é migrar para senha individual por pessoa.
+    </p>
+  </div>
+
+{% endblock %}

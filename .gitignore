@@ -1,4 +1,4 @@
-# ===== Banco de dados =====
+﻿# ===== Banco de dados =====
 # O arquivo .db NAO vai para o GitHub.
 # Outro desenvolvedor recria o banco rodando os scripts de sql/ e app/seed.py
 database/*.db
@@ -40,3 +40,7 @@ desktop.ini
 # endereco do servidor. Cada pessoa gera o seu quando precisar, entao
 # nao faz sentido versionar.
 openapi-central.json
+
+# ===== Copias de seguranca do banco =====
+# Contem dados pessoais. Nunca vao para o GitHub.
+backups/

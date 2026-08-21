@@ -1,4 +1,4 @@
-"""
+﻿"""
 main.py
 -------
 O coracao da aplicacao. Aqui ficam as ROTAS: cada endereco do site e a
@@ -24,24 +24,28 @@ um arquivo. Otimo para desenvolver, mas nao deve ser usado em producao.
 from datetime import date, datetime, timedelta
 
 import csv
+import secrets
 import io
 
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app import api, assistente, assistente_ia, auth, config, ia_local, planilha, seed
+from app import api, assistente, assistente_ia, auth, config, ia_local, planilha, seed, tempo
 from app.database import PASTA_RAIZ, get_db
 from app.menu import MENU, buscar_modulo
 from app.models import (
     CHAVE_EXIGIR_AUTORIZACAO,
     PERFIS_VALIDOS,
+    ActiveSession,
     Agreement,
+    ApiCall,
+    ApiKey,
     AuthorizedEmail,
     ChatMessage,
     Claim,
@@ -69,6 +73,34 @@ async def ao_ligar_e_desligar(app: FastAPI):
     nenhum. No seu computador o efeito é o mesmo: se você apagar o
     central.db por engano, ele volta ao ligar.
     """
+    # --- CONFERENCIA DE SEGURANCA ---
+    # Feita ANTES de qualquer outra coisa. Se houver problema grave e o
+    # sistema estiver em producao, ele nao sobe: um site no ar sem tranca
+    # e pior do que um site fora do ar.
+    problemas = config.conferir_seguranca()
+    if problemas:
+        print()
+        print("=" * 66)
+        print("  PROBLEMAS DE SEGURANCA NA CONFIGURACAO")
+        print("=" * 66)
+        for i, p in enumerate(problemas, 1):
+            print(f"  {i}. {p}")
+        print("=" * 66)
+
+        if config.EM_PRODUCAO:
+            print("  AMBIENTE=producao: o sistema NAO vai subir assim.")
+            print("  Corrija os itens acima e tente de novo.")
+            print("=" * 66)
+            print()
+            raise RuntimeError(
+                "Configuracao insegura para producao. Veja a lista acima."
+            )
+
+        print("  AMBIENTE=desenvolvimento: seguindo, mas CORRIJA antes de")
+        print("  colocar no ar.")
+        print("=" * 66)
+        print()
+
     if config.CRIAR_BANCO_AO_INICIAR:
         try:
             if seed.garantir_banco():
@@ -106,6 +138,73 @@ app = FastAPI(
 
 # Liga a API de integração (todos os endereços começam com /api/v1).
 app.include_router(api.router)
+
+
+# ===============================================================
+# PAGINAS DE ERRO
+# ===============================================================
+# Sem estas duas funcoes, um endereco errado mostraria um JSON cru em
+# ingles e um defeito no codigo mostraria uma tela branca. Aqui trocamos
+# as duas coisas por uma pagina em portugues, com a cara do sistema.
+#
+# A API (/api/v1) fica de FORA: quem chama a API e outro programa, e
+# programa entende JSON melhor do que HTML.
+
+
+def _pagina_de_erro(request: Request, codigo: int, icone: str,
+                    titulo: str, mensagem: str):
+    return templates.TemplateResponse(
+        request,
+        "erro.html",
+        {"codigo": codigo, "icone": icone, "titulo": titulo, "mensagem": mensagem},
+        status_code=codigo,
+    )
+
+
+@app.exception_handler(404)
+def pagina_nao_encontrada(request: Request, exc):
+    """Endereco que nao existe."""
+    if request.url.path.startswith("/api/"):
+        return JSONResponse({"detail": "Endereço não encontrado."}, status_code=404)
+
+    return _pagina_de_erro(
+        request, 404, "🧭",
+        "Página não encontrada",
+        "O endereço que você tentou abrir não existe. Talvez o link esteja "
+        "errado ou a página tenha mudado de lugar.",
+    )
+
+
+@app.exception_handler(500)
+@app.exception_handler(Exception)
+def erro_interno(request: Request, exc):
+    """
+    Defeito no proprio sistema.
+
+    O detalhe tecnico do erro vai para o TERMINAL, para quem cuida do
+    sistema investigar. Na tela mostramos so uma mensagem generica: se
+    mostrassemos o erro tecnico, poderiamos revelar caminhos de arquivo,
+    nomes de tabela e outras informacoes uteis para um invasor.
+    """
+    import traceback
+
+    print()
+    print("=" * 66)
+    print(f"  ERRO NAO TRATADO em {request.method} {request.url.path}")
+    print("=" * 66)
+    traceback.print_exception(type(exc), exc, exc.__traceback__)
+    print("=" * 66)
+    print()
+
+    if request.url.path.startswith("/api/"):
+        return JSONResponse({"detail": "Erro interno do servidor."}, status_code=500)
+
+    return _pagina_de_erro(
+        request, 500, "⚠️",
+        "Algo deu errado",
+        "O sistema encontrou um problema ao montar esta página. Não foi "
+        "culpa sua. O detalhe técnico foi registrado no servidor.",
+    )
 
 # Diz ao FastAPI onde estao o CSS/JS e as paginas HTML.
 app.mount("/static", StaticFiles(directory=PASTA_RAIZ / "static"), name="static")
@@ -153,7 +252,7 @@ def exigir_login(request: Request, db: Session = Depends(get_db)):
     """
     usuario = auth.ler_usuario_do_cookie(db, request)
     if usuario is not None:
-        usuario.email_acesso = auth.ler_email_do_cookie(request)
+        usuario.email_acesso = auth.ler_email_do_cookie(db, request)
     return usuario
 
 
@@ -195,7 +294,7 @@ def contexto(usuario: User, modulo: str, **extras) -> dict:
         "usuario": usuario,
         "menu": montar_menu(usuario),
         "modulo_atual": modulo,
-        "hoje": date.today(),
+        "hoje": tempo.hoje(),
     }
     dados.update(extras)
     return dados
@@ -282,6 +381,26 @@ def processar_login(
     """
     ip = pegar_ip(request)
 
+    # --- PROTECAO CONTRA FORCA BRUTA ---
+    # Antes de conferir qualquer senha: este endereco ja errou demais?
+    # Se sim, recusamos sem nem olhar a senha. Isso torna inviavel testar
+    # senhas em sequencia.
+    bloqueado, faltam = auth.esta_bloqueado(db, ip)
+    if bloqueado:
+        auth.registrar_login(db, email, perfil, False,
+                             f"bloqueado por excesso de tentativas ({ip})", ip=ip)
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {
+                "erro": f"Muitas tentativas incorretas. Aguarde {faltam} minuto(s) "
+                        f"antes de tentar novamente.",
+                "email_digitado": email,
+                "perfil_marcado": perfil,
+            },
+            status_code=429,  # 429 = "too many requests"
+        )
+
     # Antes de tudo: o perfil enviado e um dos tres validos?
     # Protege contra alguem enviar um perfil inventado por fora da tela.
     if perfil not in PERFIS_VALIDOS:
@@ -321,16 +440,24 @@ def processar_login(
             status_code=401,
         )
 
-    # Passos 5 e 6: cria o cracha (guardando o e-mail digitado) e manda
+    # Passos 5 e 6: abre a sessao no banco, entrega o cracha e manda
     # para o dashboard.
+    token = auth.abrir_sessao(db, usuario, email.strip().lower(), ip)
     resposta = RedirectResponse("/dashboard", status_code=303)
-    auth.criar_cookie_sessao(resposta, usuario, email=email.strip().lower())
+    auth.criar_cookie_sessao(resposta, token)
     return resposta
 
 
 @app.post("/logout")
-def logout():
-    """Sai do sistema: apaga o cracha e volta para o login."""
+def logout(request: Request, db: Session = Depends(get_db)):
+    """
+    Sai do sistema.
+
+    Faz DUAS coisas, e as duas importam:
+      1. apaga a sessao do banco — assim qualquer copia do cookie morre
+      2. apaga o cookie do navegador
+    """
+    auth.fechar_sessao(db, request)
     resposta = RedirectResponse("/login", status_code=303)
     auth.apagar_cookie_sessao(resposta)
     return resposta
@@ -349,7 +476,7 @@ def dashboard(
     if usuario is None:
         return RedirectResponse("/login", status_code=303)
 
-    hoje = date.today()
+    hoje = tempo.hoje()
 
     # --- os 4 numeros do topo ---
     total = db.query(Policy).count()
@@ -455,27 +582,77 @@ def montar_grafico_cobertura(db: Session) -> list[dict]:
     return fatias
 
 
+# Quantas apolices por pagina.
+#
+# POR QUE PAGINAR: a tela desenha uma linha de tabela para cada apolice.
+# Com 100 fica tranquilo, mas com 5.000 o navegador engasga e a pagina
+# demora para abrir. Mostrando de 50 em 50, o tempo nao cresce junto com
+# a carteira.
+APOLICES_POR_PAGINA = 50
+
+
 @app.get("/seguros", response_class=HTMLResponse)
 def seguros(
     request: Request,
+    pagina: int = 1,
+    status: str = "",
+    busca: str = "",
     db: Session = Depends(get_db),
     usuario: User | None = Depends(exigir_login),
 ):
-    """A carteira de apolices completa."""
+    """A carteira de apolices, com filtros e paginacao."""
     if usuario is None:
         return RedirectResponse("/login", status_code=303)
 
-    apolices = db.query(Policy).order_by(Policy.data_vencimento).all()
+    consulta = db.query(Policy)
+
+    if status:
+        consulta = consulta.filter(Policy.status == status)
+    if busca:
+        # ilike = nao diferencia maiuscula de minuscula.
+        # O | e "ou": procura no nome OU no numero da apolice.
+        alvo = f"%{busca}%"
+        consulta = consulta.filter(
+            (Policy.participante.ilike(alvo))
+            | (Policy.numero_apolice.ilike(alvo))
+            | (Policy.cpf.ilike(alvo))
+        )
+
+    total = consulta.count()
+
+    # Quantas paginas cabem. O -(-a // b) e um truque para arredondar
+    # para CIMA: 101 apolices em paginas de 50 dao 3 paginas, nao 2.
+    paginas = max(1, -(-total // APOLICES_POR_PAGINA))
+    pagina = max(1, min(pagina, paginas))
+
+    apolices = (
+        consulta.order_by(Policy.data_vencimento)
+        .offset((pagina - 1) * APOLICES_POR_PAGINA)
+        .limit(APOLICES_POR_PAGINA)
+        .all()
+    )
+
+    # Os status que existem de fato no banco, para montar o filtro.
+    status_existentes = [
+        s[0] for s in db.query(Policy.status).distinct().order_by(Policy.status).all()
+    ]
 
     return templates.TemplateResponse(
         request,
         "seguros.html",
-        {
-            "usuario": usuario,
-            "menu": montar_menu(usuario),
-            "modulo_atual": "seguros",
-            "apolices": apolices,
-        },
+        contexto(
+            usuario,
+            "seguros",
+            apolices=apolices,
+            total=total,
+            pagina=pagina,
+            paginas=paginas,
+            por_pagina=APOLICES_POR_PAGINA,
+            primeiro=(pagina - 1) * APOLICES_POR_PAGINA + 1 if total else 0,
+            ultimo=min(pagina * APOLICES_POR_PAGINA, total),
+            filtros={"status": status, "busca": busca},
+            status_existentes=status_existentes,
+        ),
     )
 
 
@@ -682,7 +859,7 @@ def emitir_boleto(
     if boleto and boleto.status == "A emitir":
         boleto.status = "Em aberto"
         # o boleto vence 10 dias depois de emitido
-        boleto.data_vencimento = date.today() + timedelta(days=10)
+        boleto.data_vencimento = tempo.hoje() + timedelta(days=10)
         db.commit()
 
     return RedirectResponse("/movimentacao", status_code=303)
@@ -964,7 +1141,7 @@ def sinistros(
     if fora:
         return fora
 
-    hoje = date.today()
+    hoje = tempo.hoje()
     registros = db.query(Claim).order_by(Claim.data_abertura).all()
 
     dias = [c.dias_em_aberto(hoje) for c in registros]
@@ -997,7 +1174,7 @@ def pendencias(
     if fora:
         return fora
 
-    hoje = date.today()
+    hoje = tempo.hoje()
     todas = db.query(Pendency).all()
 
     abertas = [p for p in todas if not p.resolvida]
@@ -1468,7 +1645,7 @@ def alternar_exigencia(
         db.add(registro)
 
     registro.valor = novo_valor
-    registro.atualizado_em = datetime.now()
+    registro.atualizado_em = tempo.agora()
     db.commit()
 
     if novo_valor == "sim":
@@ -1514,6 +1691,296 @@ def exportar_acessos(
         ["Data e hora", "E-mail informado", "Categoria", "IP", "Resultado", "Motivo"],
         linhas,
     )
+
+
+# ===============================================================
+# CHAVES DA API E REGISTRO DE CHAMADAS  (só o estipulante)
+# ===============================================================
+LIMITE_CHAMADAS = 100
+
+
+@app.get("/api-chaves", response_class=HTMLResponse)
+def api_chaves(
+    request: Request,
+    aviso: str = "",
+    erro: str = "",
+    chave_nova: str = "",
+    nome_novo: str = "",
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """Gerencia as chaves de API e mostra quem chamou."""
+    fora = barrar(usuario, "acessos")
+    if fora:
+        return fora
+
+    chaves = db.query(ApiKey).order_by(ApiKey.ativo.desc(), ApiKey.nome).all()
+    chamadas = (
+        db.query(ApiCall)
+        .order_by(ApiCall.data_hora.desc())
+        .limit(LIMITE_CHAMADAS)
+        .all()
+    )
+
+    total = db.query(ApiCall).count()
+    recusadas = db.query(ApiCall).filter(ApiCall.status == 401).count()
+
+    return templates.TemplateResponse(
+        request,
+        "api_chaves.html",
+        contexto(
+            usuario, "acessos",
+            chaves=chaves,
+            chamadas=chamadas,
+            limite=LIMITE_CHAMADAS,
+            kpis={
+                "total": total,
+                "recusadas": recusadas,
+                "ativas": sum(1 for c in chaves if c.ativo),
+                "tem_env": bool(config.API_KEY),
+            },
+            aviso=aviso, erro=erro,
+            chave_nova=chave_nova, nome_novo=nome_novo,
+        ),
+    )
+
+
+def _voltar_para_chaves(**parametros):
+    from urllib.parse import urlencode
+
+    limpos = {k: v for k, v in parametros.items() if v}
+    destino = "/api-chaves"
+    if limpos:
+        destino += "?" + urlencode(limpos)
+    return RedirectResponse(destino, status_code=303)
+
+
+@app.post("/api-chaves/criar")
+def criar_chave_api(
+    nome: str = Form(...),
+    observacao: str = Form(""),
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """
+    Cria uma chave para um parceiro.
+
+    A chave completa e mostrada UMA VEZ, na volta para a tela. Depois
+    disso nem nos conseguimos ver: guardamos so o hash, igual as senhas.
+    Se o parceiro perder, gera-se outra.
+    """
+    fora = barrar(usuario, "acessos")
+    if fora:
+        return fora
+
+    nome = (nome or "").strip()
+    if len(nome) < 3:
+        return _voltar_para_chaves(erro="Dê um nome ao parceiro (ao menos 3 letras).")
+
+    if db.query(ApiKey).filter(ApiKey.nome == nome).first():
+        return _voltar_para_chaves(erro=f'Já existe uma chave chamada "{nome}".')
+
+    # token_urlsafe(32) gera algo impossivel de adivinhar. O prefixo
+    # "cis_" ajuda quem receber a saber de onde a chave veio.
+    chave = "cis_" + secrets.token_urlsafe(32)
+
+    db.add(ApiKey(
+        nome=nome,
+        chave_hash=auth.gerar_hash(chave),
+        inicio=chave[:12],
+        observacao=(observacao or "").strip() or None,
+        ativo=True,
+        criado_por=usuario.email_acesso or usuario.nome,
+    ))
+    db.commit()
+
+    return _voltar_para_chaves(chave_nova=chave, nome_novo=nome)
+
+
+@app.post("/api-chaves/alternar/{chave_id}")
+def alternar_chave_api(
+    chave_id: int,
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """Bloqueia ou reativa uma chave."""
+    fora = barrar(usuario, "acessos")
+    if fora:
+        return fora
+
+    registro = db.query(ApiKey).filter(ApiKey.id == chave_id).first()
+    if registro is None:
+        return _voltar_para_chaves(erro="Chave não encontrada.")
+
+    registro.ativo = not registro.ativo
+    db.commit()
+    situacao = "reativada" if registro.ativo else "bloqueada"
+    return _voltar_para_chaves(aviso=f'A chave "{registro.nome}" foi {situacao}.')
+
+
+@app.post("/api-chaves/remover/{chave_id}")
+def remover_chave_api(
+    chave_id: int,
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """
+    Apaga a chave de vez.
+
+    O historico de chamadas dela e preservado: apenas perde o vinculo,
+    mas o nome do parceiro continua gravado em cada linha.
+    """
+    fora = barrar(usuario, "acessos")
+    if fora:
+        return fora
+
+    registro = db.query(ApiKey).filter(ApiKey.id == chave_id).first()
+    if registro is None:
+        return _voltar_para_chaves(erro="Chave não encontrada.")
+
+    nome = registro.nome
+    db.query(ApiCall).filter(ApiCall.api_key_id == chave_id).update(
+        {ApiCall.api_key_id: None}
+    )
+    db.delete(registro)
+    db.commit()
+
+    return _voltar_para_chaves(aviso=f'A chave "{nome}" foi removida.')
+
+
+@app.get("/api-chaves/exportar")
+def exportar_chamadas_api(
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """Baixa o registro de chamadas da API em .csv."""
+    fora = barrar(usuario, "acessos")
+    if fora:
+        return fora
+
+    registros = db.query(ApiCall).order_by(ApiCall.data_hora.desc()).all()
+    linhas = [
+        [
+            c.data_hora.strftime("%d/%m/%Y %H:%M:%S"),
+            c.parceiro or "(não identificado)",
+            c.metodo,
+            c.caminho,
+            c.status,
+            c.ip or "",
+            c.resumo or "",
+        ]
+        for c in registros
+    ]
+    return gerar_csv(
+        "chamadas_da_api.csv",
+        ["Data e hora", "Parceiro", "Método", "Endereço", "Status", "IP", "Resumo"],
+        linhas,
+    )
+
+
+# ===============================================================
+# TROCAR A SENHA DE UMA CATEGORIA  (só o estipulante)
+# ===============================================================
+@app.get("/senha", response_class=HTMLResponse)
+def tela_senha(
+    request: Request,
+    aviso: str = "",
+    erro: str = "",
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """Tela para trocar a senha de uma das três categorias."""
+    fora = barrar(usuario, "acessos")
+    if fora:
+        return fora
+
+    contas = db.query(User).order_by(User.perfil).all()
+    sessoes = {}
+    for c in contas:
+        sessoes[c.perfil] = db.query(ActiveSession).filter(
+            ActiveSession.user_id == c.id
+        ).count()
+
+    return templates.TemplateResponse(
+        request,
+        "senha.html",
+        contexto(usuario, "acessos", contas=contas, sessoes=sessoes,
+                 aviso=aviso, erro=erro),
+    )
+
+
+@app.post("/senha/trocar")
+def trocar_senha(
+    perfil: str = Form(...),
+    senha_atual: str = Form(...),
+    nova: str = Form(...),
+    repetir: str = Form(...),
+    derrubar: str = Form(""),
+    db: Session = Depends(get_db),
+    usuario: User | None = Depends(exigir_login),
+):
+    """
+    Troca a senha de uma categoria.
+
+    Exige a senha ATUAL daquela categoria. Assim, mesmo que alguem
+    esqueca a tela aberta, nao consegue trocar senhas sem saber a antiga.
+    """
+    from urllib.parse import urlencode
+
+    def voltar(**p):
+        limpos = {k: v for k, v in p.items() if v}
+        destino = "/senha"
+        if limpos:
+            destino += "?" + urlencode(limpos)
+        return RedirectResponse(destino, status_code=303)
+
+    fora = barrar(usuario, "acessos")
+    if fora:
+        return fora
+
+    if perfil not in PERFIS_VALIDOS:
+        return voltar(erro="Categoria inválida.")
+
+    conta = db.query(User).filter(User.perfil == perfil).first()
+    if conta is None:
+        return voltar(erro="Categoria não encontrada.")
+
+    if not auth.conferir_senha(senha_atual, conta.senha_hash):
+        return voltar(erro=f"A senha atual de {perfil} está incorreta.")
+
+    if len(nova) < 10:
+        return voltar(erro="A senha nova precisa ter ao menos 10 caracteres.")
+
+    if nova != repetir:
+        return voltar(erro="A senha nova e a repetição não são iguais.")
+
+    if auth.conferir_senha(nova, conta.senha_hash):
+        return voltar(erro="A senha nova é igual à atual.")
+
+    conta.senha_hash = auth.gerar_hash(nova)
+    db.commit()
+
+    mensagem = f"Senha de {perfil} trocada."
+
+    # Derrubar as sessoes obriga todo mundo daquela categoria a entrar de
+    # novo com a senha nova. E o certo quando a troca foi por vazamento.
+    if derrubar == "sim":
+        quantas = auth.encerrar_todas_as_sessoes(db, perfil)
+        mensagem += f" {quantas} sessão(ões) encerrada(s)."
+
+    # A senha nova FICA GRAVADA e sobrevive a reinicios: ao ligar, o
+    # sistema so popula o banco se ele estiver vazio, entao nao sobrescreve
+    # nada. O .env vale apenas na PRIMEIRA criacao do banco.
+    #
+    # A unica coisa que desfaz a troca e rodar "python -m app.seed" de
+    # proposito, que apaga tudo e recria do zero.
+    mensagem += (
+        " A senha nova já está valendo e continua após reiniciar o servidor."
+        " Vale atualizar o .env também, para o caso de o banco ser recriado"
+        " algum dia."
+    )
+
+    return voltar(aviso=mensagem)
 
 
 # ===============================================================
