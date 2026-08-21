@@ -35,29 +35,37 @@ central-inteligente-seguros/
 ├── app/                  # o codigo Python da aplicacao
 │   ├── main.py           # as rotas: cada endereco do site
 │   ├── database.py       # conexao com o banco
-│   ├── models.py         # as 14 tabelas
-│   ├── auth.py           # senha, login, sessao e permissoes
-│   ├── config.py         # le o arquivo .env
+│   ├── models.py         # as 17 tabelas
+│   ├── auth.py           # senha, login, sessao, permissoes, forca bruta
+│   ├── config.py         # le o .env e confere a seguranca ao ligar
+│   ├── tempo.py          # a hora certa (fuso de Brasilia)
 │   ├── menu.py           # os itens do menu lateral
 │   ├── seed.py           # cria e popula o banco
+│   ├── cadastros.py      # a descricao dos campos de cada cadastro
 │   ├── planilha.py       # le a planilha .xlsx enviada
 │   ├── api.py            # a API para sistemas parceiros
-│   ├── assistente.py     # assistente por palavras-chave
-│   └── assistente_ia.py  # assistente com IA (Claude)
+│   ├── assistente.py     # as respostas do assistente
+│   ├── ia_treino.py      # as perguntas de exemplo da IA local
+│   ├── ia_local.py       # a IA treinada aqui (aprendizado de maquina)
+│   └── assistente_ia.py  # a IA na nuvem (Claude), opcional
 ├── templates/            # as paginas HTML
 ├── static/
 │   ├── css/style.css     # a folha de estilo, com a paleta oficial
-│   ├── js/main.js        # avisos de carregamento e busca nas tabelas
+│   ├── js/main.js        # avisos de carregamento, busca, conversa
 │   └── img/              # logo e favicon
 ├── database/             # o arquivo central.db (nao vai para o GitHub)
+├── backups/              # copias do banco (nao vao para o GitHub)
 ├── sql/banco.sql         # script para recriar o banco do zero
 ├── prototipo/            # o prototipo HTML original, intacto
 ├── docs/                 # documentacao do projeto
-├── tests/                # 6 arquivos de teste
+├── tests/                # 9 arquivos de teste
 ├── venv/                 # ambiente virtual (nao vai para o GitHub)
 ├── requirements.txt
+├── backup.py             # faz e restaura copias do banco
+├── gerar_openapi.py      # gera o arquivo para o Copilot Studio
 ├── render.yaml           # receita de publicacao no servidor
 ├── DEPLOY.md             # guia para colocar no ar
+├── COPILOT-STUDIO.md     # guia do agente no Copilot
 ├── .env.example          # modelo de configuracao
 ├── .gitignore
 └── README.md
@@ -100,7 +108,7 @@ o seu, com um comando so:
 python -m app.seed
 ```
 
-Isso cria as 14 tabelas e preenche com os dados de demonstracao
+Isso cria as 17 tabelas e preenche com os dados de demonstracao
 (3 categorias de acesso e 100 apolices). Pode rodar quantas vezes
 quiser — ele sempre refaz do zero.
 
@@ -142,15 +150,42 @@ python tests\test_banco.py          # 48 — banco e dados
 python tests\test_login.py          # 49 — login e permissoes
 python tests\test_modulos.py        # 94 — as telas dos modulos
 python tests\test_novidades.py      # 61 — planilha e API
-python tests\test_acessos.py        # 77 — controle de acesso e assistente
-python tests\test_assistente_ia.py  # 48 — a IA e a memoria da conversa
+python tests\test_acessos.py        # 77 — controle de acesso
+python tests\test_assistente_ia.py  # 48 — a IA na nuvem e a conversa
+python tests\test_ia_local.py       # 79 — a IA treinada aqui
+python tests\test_seguranca.py      # 50 — as correcoes de seguranca
+python tests\test_cadastros.py      # 83 — cadastrar, editar, excluir
 ```
 
-Total: **377 verificacoes**. Nao precisa estar com o servidor ligado —
+Total: **589 verificacoes**. Nao precisa estar com o servidor ligado —
 os testes sobem a aplicacao por dentro.
 
 Rode sempre depois de mexer no codigo. Se aparecer `[FALHOU]`, a linha
 diz exatamente o que quebrou.
+
+> O `test_seguranca.py` merece atencao: cada verificacao dele
+> corresponde a um problema que EXISTIU e foi corrigido (XSS, forca
+> bruta, logout que nao invalidava a sessao...). Se algum voltar, aquele
+> arquivo acusa.
+
+---
+
+## Copias de seguranca
+
+O banco e um unico arquivo e nao vai para o GitHub. Se ele corromper,
+os dados enviados por planilha se perdem. Por isso:
+
+```powershell
+python backup.py                 # faz uma copia agora
+python backup.py --listar        # mostra as copias existentes
+python backup.py --restaurar 3   # volta para a copia numero 3
+```
+
+As copias ficam em `backups/`, que tambem nao vai para o GitHub. As 30
+mais recentes sao guardadas; as antigas saem sozinhas.
+
+Vale automatizar: no Windows, pelo Agendador de Tarefas; num servidor
+Linux, por cron. O passo a passo esta comentado no `backup.py`.
 
 ---
 
@@ -173,7 +208,30 @@ As 12 telas funcionam, lendo dados do banco.
 | `/pendencias` | Pendencias | o que falta resolver |
 | `/assistente` | Assistente | perguntas respondidas com o banco |
 | `/acessos` | Controle de Acesso | quem pode entrar e quem ja entrou |
+| `/api-chaves` | Chaves da API | uma chave por parceiro + quem chamou |
+| `/senha` | Trocar senha | troca a senha de uma categoria |
 | `/docs` | Documentacao da API | pagina automatica, da para testar por ali |
+
+As tres ultimas sao de administracao e **so o estipulante** enxerga.
+
+### Cadastrar, editar e excluir
+
+Cinco telas tem botao de **+ Novo** e link de **Editar** em cada linha:
+apolices, sinistros, propostas, pendencias e inadimplencia.
+
+O que muda entre elas esta descrito em **`app/cadastros.py`** — um unico
+formulario (`templates/cadastro.html`) desenha todas. Para acrescentar
+um campo, e **uma linha** naquele arquivo: nenhum HTML precisa ser
+tocado.
+
+O formulario aceita valor nos dois formatos (`1.234,56` e `1234.56`) e
+data nos dois (`25/12/2026` e `2026-12-25`), mostra todos os erros de uma
+vez e volta preenchido quando algo esta errado. Nada e gravado se houver
+qualquer problema.
+
+A permissao do cadastro e a **mesma** da listagem, e vale tambem no
+endereco direto: quem nao ve sinistros nao cadastra sinistros nem
+chamando a rota na mao.
 
 ### Coisas que realmente funcionam (nao sao so telas)
 
@@ -230,6 +288,36 @@ python gerar_openapi.py https://seu-endereco-publico
 
 > Exige o sistema **publicado na internet**: o Copilot Studio nao
 > alcanca `127.0.0.1`.
+
+### Seguranca
+
+O sistema passou por uma auditoria e os 12 pontos encontrados foram
+corrigidos. O que esta em vigor hoje:
+
+| Protecao | Como funciona |
+|---|---|
+| Senhas | guardadas com hash bcrypt, nunca em texto |
+| Sessao | o cookie carrega so um codigo aleatorio; a sessao mora no banco |
+| Logout | apaga a sessao do banco, entao um cookie copiado morre na hora |
+| Forca bruta | 8 falhas do mesmo IP em 10 min bloqueiam por 15 min |
+| Permissoes | travadas no servidor, nao so no menu |
+| Lista de acesso | opcional: so entra quem estiver autorizado |
+| Chaves de API | uma por parceiro, guardadas com hash |
+| Registro | todo login e toda chamada de API ficam gravados |
+| Conferencia ao ligar | em producao, o sistema **se recusa a subir** com a SECRET_KEY padrao, com senha do exemplo ou com chave curta |
+
+**Duas coisas para nao esquecer antes de colocar no ar:**
+
+1. Gere uma `SECRET_KEY` propria e troque as tres senhas. O sistema nao
+   sobe em producao sem isso — e proposital.
+2. Ligue a **exigencia da lista de acesso**, na tela de Controle de
+   Acesso. Sem ela, qualquer e-mail entra sabendo a senha da categoria.
+
+**Limitacao conhecida:** a senha e da CATEGORIA, nao da pessoa. Para
+tirar o acesso de uma pessoa e preciso trocar a senha de todas as
+daquela categoria, e o e-mail registrado no historico e o que a pessoa
+digitou — o sistema nao confere se e dela. Se um dia o registro precisar
+valer como prova formal, o caminho e migrar para senha individual.
 
 ### Identidade visual
 
@@ -365,12 +453,15 @@ categoria e resultado, e exportacao em CSV.
 
 ## As tabelas do banco
 
-São **14 tabelas**:
+São **17 tabelas**:
 
 | Tabela | O que guarda |
 |---|---|
 | `users` | as 3 categorias de acesso e a senha de cada uma |
+| `active_sessions` | quem esta logado agora (uma linha por pessoa) |
 | `authorized_emails` | quem pode entrar (e-mails e dominios liberados) |
+| `api_keys` | uma chave de API por parceiro, guardada com hash |
+| `api_calls` | quem chamou a API, quando, o que e o resultado |
 | `settings` | configuracoes que o estipulante liga pela tela |
 | `login_history` | cada tentativa de acesso: quem, quando, de qual IP |
 | `chat_messages` | a conversa de cada pessoa com o assistente |
@@ -454,26 +545,31 @@ infraestrutura homologada do Sebrae Previdencia.
 ## Status do desenvolvimento
 
 - [x] **Fase 1** — analise do prototipo e preparacao do ambiente
-- [x] **Fase 2** — banco de dados (`users`, `login_history`, `policies`)
-- [x] **Fase 3** — tela de login, autenticacao, permissoes e dashboard
-- [x] **Fase 4** — todas as 11 telas do prototipo funcionando
+- [x] **Fase 2** — banco de dados
+- [x] **Fase 3** — login, autenticacao, permissoes e dashboard
+- [x] **Fase 4** — todas as telas do prototipo funcionando
+- [x] **Fase 5** — planilha, API, controle de acesso, identidade visual
+- [x] **Fase 6** — assistente com aprendizado de maquina
+- [x] **Fase 7** — auditoria de seguranca e correcao dos 12 pontos
+- [x] **Fase 8** — telas de cadastrar, editar e excluir
 
-### O que ficou de fora (proximos passos)
+**589 verificacoes automatizadas**, em 9 arquivos de teste.
 
-Coisas que o prototipo sugeria mas que **nao** foram implementadas,
-porque exigem decisoes de negocio ou integracoes externas:
+### O que ficou de fora, e por que
 
-- **Envio de planilha pela tela** — hoje a base entra pelo `app/seed.py`.
-  Ler um `.xlsx` enviado pelo navegador e o proximo passo natural.
-- **Integracoes por API** (ICATU, corretora, Trust Prev) — dependem de
-  credenciais e homologacao de seguranca; a tela `/integracoes` explica.
-- **Area do Participante** — autoatendimento, previsto para depois.
-- **Cadastro de usuarios pela tela** — hoje os 3 usuarios sao criados
-  pelo seed. Nao ha tela de "novo usuario" nem troca de senha.
-- **Envio real de e-mail de cobranca** — o botao "Cobrar" marca no
-  banco, mas nao dispara e-mail.
-- **Grafico de capital por mes** no dashboard — nao temos dados
-  historicos de capital, so de comissao.
+Nada disso e falta de codigo: sao coisas que dependem de decisao de
+negocio, de credenciais de terceiros ou de infraestrutura.
+
+| O que falta | Do que depende |
+|---|---|
+| **Publicar num servidor** | decisao de onde hospedar (veja o aviso de LGPD no DEPLOY.md) |
+| **Integracao com ICATU e corretora** | esses sistemas terem API, liberarem credenciais e passarem pela homologacao de seguranca. A **nossa** metade esta pronta: a Central publica e recebe |
+| **Area do Participante** | autoatendimento; previsto para depois |
+| **Envio real de e-mail** | o botao "Cobrar" marca no banco, mas nao dispara e-mail. Exige um servidor de envio (SMTP) configurado |
+| **Login individual por pessoa** | hoje a senha e por categoria. Trocar e uma decisao de operacao, nao tecnica |
+| **Cadastro de usuarios pela tela** | so faz sentido junto com o login individual |
+| **Grafico de capital por mes** | nao temos dados historicos de capital, so de comissao |
+| **Receber apolices e sinistros por API** | so a movimentacao tem endereco de recebimento hoje. Os outros 8 serao feitos quando o formato do parceiro for conhecido — construir antes seria adivinhar os nomes dos campos |
 
 ---
 
